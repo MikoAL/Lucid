@@ -13,14 +13,15 @@ sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFuncti
 text = ''
 session = 1
 serial_number = 1
+def init_session():
+    global session
+    f = open("session_number.txt", "r")
+    session = int(f.read)
+    f.close()
 
-f = open("session_number.txt", "r")
-session = int(f.read)
-f.close()
-
-f = open("session_number.txt", "w")
-f.write(str(session+1))
-f.close()
+    f = open("session_number.txt", "w")
+    f.write(str(session+1))
+    f.close()
 
 """
 document_example = [text] 

@@ -1,7 +1,7 @@
 import Lucid_generation as generation
 import Lucid_preprocess as preprocess
 import Lucid_postprocess as postprocess
-#import Lucid_memory as memory
+import Lucid_memory as memory
 
 
 
@@ -11,6 +11,8 @@ def main():
 
     history_counter = 0 # Saves every time this counter hits 4.
     
+    memory.init_session()
+        
     while True:
         user_input= input('Miko: ')
         
@@ -26,7 +28,7 @@ def main():
         
         if history_counter == 4:
             history_counter = 0
-            print(f'This is what would have been saved:\n {history[-4:]}')
+            memory.save_history(history[-4:])
         if len(history) == 12:
             del history[:2]
         
