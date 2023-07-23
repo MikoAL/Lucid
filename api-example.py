@@ -1,5 +1,3 @@
-
-# Use a pipeline as a high-level helper
 import requests
 
 # For local streaming, the websockets are hosted without ssl - http://
@@ -10,12 +8,12 @@ URI = f'http://{HOST}/api/v1/generate'
 # URI = 'https://your-uri-here.trycloudflare.com/api/v1/generate'
 
 
-def llm(prompt):
+def run(prompt):
     request = {
         'prompt': prompt,
         'max_new_tokens': 250,
         'do_sample': True,
-        'temperature': 0.01,
+        'temperature': 1.3,
         'top_p': 0.1,
         'typical_p': 1,
         'epsilon_cutoff': 0,  # In units of 1e-4
@@ -45,6 +43,9 @@ def llm(prompt):
 
     if response.status_code == 200:
         result = response.json()['results'][0]['text']
-        return result
+        print(prompt + result)
 
 
+if __name__ == '__main__':
+    prompt = "In order to make homemade bread, follow these steps:\n1)"
+    run(prompt)
