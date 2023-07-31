@@ -2,6 +2,7 @@ import Lucid_generation as generation
 import Lucid_preprocess as preprocess
 import Lucid_postprocess as postprocess
 import Lucid_memory as memory
+import Lucid_emotion_detection as emotion_detection
 
 from flask import Flask, request, jsonify
 
@@ -11,11 +12,14 @@ history = []
 
 history_counter = 0 # Saves every time this counter hits 4.
 
+working_memory = []
+
+
 if incognito != True:
     memory.init_session()
 import time
 
-print('1')
+#print('1')
 app = Flask(__name__)
 
     
@@ -25,6 +29,8 @@ def handle_message():
     global history_counter
     global incognito
     global history
+    global working_memory
+    
     data = request.get_json()
     message = data.get('message')
 
@@ -49,9 +55,11 @@ def handle_message():
     
     # Process the message and prepare the response
     response_message = f"{llm_response.strip()}"
+    emotion = emotion_detection.emotion_dectection(response_message)
     #time.sleep(5)
-    print(jsonify({'response': response_message}))
-    return jsonify({'response': response_message})
+    
+    print(jsonify({'response': response_message,'emotion':emotion}))
+    return jsonify({'response': response_message,'emotion':emotion})
 
 if __name__ == "__main__":
     app.run(port=5001)
