@@ -3,6 +3,8 @@ import Lucid_preprocess as preprocess
 import Lucid_postprocess as postprocess
 import Lucid_memory as memory
 import Lucid_emotion_detection as emotion_detection
+import Lucid_autistic as autisitc
+
 
 from flask import Flask, request, jsonify
 
@@ -17,6 +19,9 @@ working_memory = []
 
 if incognito != True:
     memory.init_session()
+
+autisitc.init_classify_sentence()    
+
 import time
 
 #print('1')

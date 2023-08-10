@@ -1,25 +1,27 @@
 import Lucid_templates as templates
 import Lucid_memory as memory
+import Lucid_autistic as autistic
+
 
 def preprocess(input: str, history: list):
     output = ''
     user_input = 'Miko: '+input
     history.append(user_input)
-    
+    recommendation = autistic.react_to_sentence(input)
     history_str = '\n'.join(history)
     possible_context = memory.get_history(history_str)
     
-    output = f"""Below is an instruction that describes a task. Write a response that appropriately completes the request. 
-### Instruction: {templates.character}
-Info that may be relevant: 
-{possible_context}
-Overall Goal: {templates.overall_goal}
-    
-{templates.chat}
-    
-{history_str}
-    
-Lucid:### Response: """
+#    output = f"""Below is an instruction that describes a task. Write a response that appropriately completes the request. 
+#### Instruction: {templates.character}
+#Info that may be relevant: 
+#{possible_context}
+#Overall Goal: {templates.overall_goal}
+#    
+#{templates.chat}
+#    
+#{history_str}
+#    
+#Lucid:### Response: """
 
     output=f"""Lucid is a female AI assistant created by a boy named Miko.
 
@@ -35,6 +37,8 @@ Personality: [Vivacious, Amiable, Confident, Devoted, Informative, Endearing, Wi
 
 ### Chat History:
 {history_str}
+
+### Recommendation: {recommendation}
 
 ### Response:
 Lucid:"""
