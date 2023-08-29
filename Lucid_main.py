@@ -3,10 +3,13 @@ import Lucid_preprocess as preprocess
 import Lucid_postprocess as postprocess
 import Lucid_memory as memory
 import Lucid_emotion_detection as emotion_detection
-import Lucid_autistic as autisitc
+#import Lucid_autistic as autisitc
+#import Lucid_server as server
+import Lucid_classification as classification
+import Lucid_templates as templates
 
-
-from flask import Flask, request, jsonify
+import requests
+#from flask import Flask, request, jsonify
 
 incognito = True
 
@@ -15,59 +18,76 @@ history = []
 history_counter = 0 # Saves every time this counter hits 4.
 
 working_memory = []
+# 8 items
+# show 4 items
+# based on an importance value?
+# changes based on newest log?
+
+info = []
+
+action_list = []
+
+logs = []
+# [{timestamp}]SOURCE: {source}; TYPE: {type}; CONTENT: {text}
+
 
 
 if incognito != True:
     memory.init_session()
 
-autisitc.init_classify_sentence()    
+#autisitc.init_classify_sentence()    
 
 import time
 
 #print('1')
-app = Flask(__name__)
 
-    
 
-@app.route('/message', methods=['POST'])
-def handle_message():
-    global history_counter
-    global incognito
-    global history
-    global working_memory
-    
-    data = request.get_json()
-    message = data.get('message')
+def log_to_string(log: dict):
+    #return f'[{log["timestamp"]}]SOURCE: {log["source"]}; TYPE: {log["type"]}; CONTENT: {log["text"]}'
+    return f'[{log["timestamp"]}]{log["source"]}: {log["text"]}'
 
-    user_input= message
-    
-    
-    
-    preprocessed_text = preprocess.preprocess(user_input,history)
-    llm_response = generation.llm(preprocessed_text)
-    llm_response = postprocess.postprocess(llm_response)
-    history.append(f'Lucid: {llm_response}')
-    history_counter += 2
-    
-    #print(f'Lucid: {llm_response}')
-    
-    if history_counter == 4:
-        history_counter = 0
-        if incognito != True:
-            memory.save_history(history[-4:])
-    if len(history) == 12:
-        del history[:2]
-    
-    # Process the message and prepare the response
-    response_message = f"{llm_response.strip()}"
-    emotion = emotion_detection.emotion_dectection(response_message)
-    #time.sleep(5)
-    
-    print(jsonify({'response': response_message,'emotion':emotion}))
-    return jsonify({'response': response_message,'emotion':emotion})
+def get_newest_info():
+    global info
+    #info.extend(server.new_info)
+    #server.reset_new_info()
+    backend_url = 'http://127.0.0.1:5001/mailbox/info'  # Replace this with your backend URL
+    response = requests.get(backend_url)
+    return response.json()['info']
 
-if __name__ == "__main__":
-    app.run(port=5001)
+def decide_action(info):
+    
+    return
+def importance():
+    # threat > newest message 
+    return
+
+def eval_info(info: list):
+    result = []
+    for i in info:
+        if i['type'] == 'text':
+            message_type = classification.message_type_classification(i['text'])
+            i['message_type'] = message_type
+                
+    return info
+
+def cycle():
+    info = get_newest_info()
+    info = eval_info(info)
+    sending_to_llm = ''
+    sending_to_llm += templates.Lucid_character
+    
+    sending_to_llm += "\nLogs:"
+    for log in info:
+        log_str = log_to_string(log)
+        sending_to_llm += f"\n{log_str}"
+    print(sending_to_llm)
+        
+    
+    
+while True:
+    the_input = input("ready?") 
+    cycle()  
+
 
 
 
