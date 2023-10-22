@@ -40,7 +40,11 @@ if incognito != True:
 import time
 
 #print('1')
-
+def working_memories_md(wm_list):
+    result = ''
+    for i in wm_list:
+        result += f"- {i}\n"
+    return result
 
 def log_to_string(log: dict):
     #return f'[{log["timestamp"]}]SOURCE: {log["source"]}; TYPE: {log["type"]}; CONTENT: {log["text"]}'
