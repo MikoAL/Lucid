@@ -24,13 +24,9 @@ json:""" + '{'
 
 
 # For a given chunk of text, generate a pair of question and answer
-import Lucid_generation as generation
-
-import json
-
-def observe(text):
+def observe(text): # Gather information
     prompt = f"""{text}
-Make a list of crucial observations about the above conversation in a json format. The observations should be understood without context.
+Make an array of crucial observations about the above conversation in a json format. These observations would affect decision making and the observations should be understood without context.
 json:""" + '{\"observations\":[\"'
 
     prompt2 = f"""<|im_start|>system
