@@ -76,11 +76,7 @@ def eval_info(info: list):
 
 def cycle():
     info = get_newest_info()
-    info = eval_info(info)
-    sending_to_llm = ''
-    sending_to_llm += templates.Lucid_character
-    
-    sending_to_llm += "\nLogs:"
+
     for log in info:
         log_str = log_to_string(log)
         sending_to_llm += f"\n{log_str}"
