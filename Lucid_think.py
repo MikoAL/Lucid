@@ -60,7 +60,7 @@ def action(current_conversation, WM):
     #global working_memory
     thought = ''
     request = f"""{current_conversation}
-What are your next actions as Lucid? Start with the phrase 'I should'. Be concise."""
+What will you do next as Lucid? Start with the phrase 'I should'. Be concise. Specifiy whether you are doing the action now or later."""
     prompt = build_prompt(WM, request)
     thought = generation.llm(prompt)
     return thought.strip()

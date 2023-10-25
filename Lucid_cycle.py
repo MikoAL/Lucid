@@ -5,7 +5,7 @@ current_conversation = []
 working_memory = []
 
 def cycle(current_conversation, working_memory):
-    updated_conversation = ''
+    updated_conversation = current_conversation
     current_conversation_str = ('\n'.join(current_conversation)).strip()
     observations = think.observe(current_conversation_str, working_memory)
 
@@ -19,13 +19,15 @@ def cycle(current_conversation, working_memory):
     
     # pick an action, (based on the response "actions")
     timeframe = classification.zeroshot_classification(actions, ['immediate', 'later'])['labels'][0]
+    print(actions)
+    print(timeframe)
     
     if timeframe == 'later':
         return current_conversation, working_memory
     elif timeframe == 'immediate':
         response = think.converse(current_conversation_str, working_memory)
-        updated_conversation = current_conversation.append(f'Lucid: {response}')
-    return updated_conversation, working_memory
+        updated_conversation.append(f'Lucid: {response}')
+        return updated_conversation, working_memory
 
 def demo():
     working_memory = []
