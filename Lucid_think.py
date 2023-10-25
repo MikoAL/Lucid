@@ -65,6 +65,13 @@ What are your next actions as Lucid? Start with the phrase 'I should'. Be concis
     thought = generation.llm(prompt)
     return thought.strip()
 
+def converse(current_conversation, WM):
+    
+    request = f"{current_conversation}\nAbove is the current conversation, based on the current conversation and Lucid's working memory and personality, generate a response as Lucid."
+    prompt = build_prompt(WM, request)
+    response = generation.llm(prompt)
+    
+    return response
 def demo():
     current_conversation = """Edward: Lucid, I think I'm in love with Bella.. 
     Lucid: Dont say anything else.. 
@@ -89,4 +96,4 @@ def demo():
 
     print(f'actions: {actions}')
     
-demo()
+
