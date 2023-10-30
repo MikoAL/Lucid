@@ -1,6 +1,9 @@
-
 import Lucid_think as think
 import Lucid_classification as classification
+from qdrant_client import QdrantClient
+
+
+qdrant = QdrantClient(":memory:") # Create in-memory Qdrant instance, for testing, CI/CD
 current_conversation = []
 working_memory = []
 
@@ -37,3 +40,14 @@ def demo():
     "Lucid: Open your fu**ing door.. I'm outside"]
     print(cycle(current_conversation, working_memory))
 demo()
+
+
+def main():
+    working_memory = []
+    current_conversation = []
+    while True:
+        user_input = input('Say: ')
+        current_conversation.append(f'Miko: {user_input}')
+        current_conversation, working_memory = cycle(current_conversation, working_memory)
+        print(current_conversation[-1])
+    

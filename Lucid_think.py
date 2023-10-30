@@ -97,3 +97,7 @@ def demo():
     print(f'actions: {actions}')
     
 
+#class GenerateThought:
+#    def __init__(self, custom_prompt):
+        
+    
