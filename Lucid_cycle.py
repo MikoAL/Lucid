@@ -67,10 +67,9 @@ def cycle(current_conversation, working_memory):
     working_memory.append(observations)
     add_working_memory(observations)
     
-    print(f'five_w_one_h: {five_w_one_h}')
-    print(f'observations: {observations}')
-    combined = think.compare_info(five_w_one_h, observations)
-    print(combined)
+    #print(f'five_w_one_h: {five_w_one_h}')
+    #print(f'observations: {observations}')
+
     #relevant_question_list = think.relevant_questions(current_conversation_str, working_memory)
 
     #working_memory.append(relevant_question_list)
@@ -96,6 +95,7 @@ def demo():
     'Edward: What do you mean?',
     "Lucid: Open your fu**ing door.. I'm outside"]
     cycle(current_conversation, working_memory)
+    
 demo()
 
 
