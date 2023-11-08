@@ -4,6 +4,8 @@ import Lucid_classification as classification
 from qdrant_client import models, QdrantClient
 from sentence_transformers import SentenceTransformer
 
+import time
+
 working_memory_vector = QdrantClient(":memory:") # Create in-memory Qdrant instance, for testing, CI/CD
 current_conversation = []
 working_memory = []
@@ -40,7 +42,7 @@ def compare_add_working_memory(the_memory, threshold = 0.75):
             models.Record(
                 id=info2_id, # Replacing info2 completely
                 vector=encoder.encode(combined).tolist(),
-                payload= {'text':combined, 'recall_count':info2_recall_count+1}
+                payload= {'text':combined, 'recall_count':info2_recall_count+1, 'last_recall':time.time()}
             ) 
         ]
     )
@@ -60,7 +62,7 @@ def add_working_memory(the_memory):
             models.Record(
                 id=working_memory_idx,
                 vector=encoder.encode(the_memory).tolist(),
-                payload= {'text':the_memory, 'recall_count': 0}
+                payload= {'text':the_memory, 'recall_count': 0, 'last_recall':time.time()}
             ) 
         ]
     )
@@ -78,10 +80,14 @@ def get_new_working_memory(current_conversation):
     for hit in hits:
         info = hit.payload['text']
         new_working_memory.append(info)
-        
+        delta_time = time.time() - hit.payload['last_recall']
+        if delta_time >= 15.0:
+            recall_count = hit.payload['recall_count']+1
+        else:
+            recall_count = hit.payload['recall_count']
         working_memory_vector.set_payload(
             collection_name="working_memory",
-            payload={'text':info, 'recall_count':(hit.payload['recall_count']+1)},
+            payload={'recall_count':recall_count, 'last_recall':time.time()},
             points=hit.vector
         )
 
