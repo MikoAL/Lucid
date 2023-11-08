@@ -53,7 +53,7 @@ Info2: {info2}.
 - Do not remove conflicting sources just because they contradict others.
 - Do not arbitrarily declare one source as 'true' and discard the rest, except in rare cases of factual error.
 
-Start now."""
+Start here."""
     
     prompt = build_prompt([], request)
     #print(prompt)

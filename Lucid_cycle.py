@@ -29,10 +29,21 @@ def compare_add_working_memory(the_memory, threshold = 0.75):
     for hit in hits:
         info2 = hit.payload['text']
         score = hit.score
+        info2_id = hit.id
     
     if score >= threshold:
         combined = think.compare_info(info1, info2)
-        return combined
+        working_memory_vector.upload_records(
+        collection_name="working_memory",
+        records=[
+            models.Record(
+                id=info2_id, # Replacing info2 completely
+                vector=encoder.encode(combined).tolist(),
+                payload= {'text':combined}
+            ) 
+        ]
+    )
+        return 
     else:
         add_working_memory(the_memory)
         return
@@ -55,7 +66,7 @@ def add_working_memory(the_memory):
     working_memory_idx += 1
 
 
-def cycle(current_conversation, working_memory):
+def thinking_cycle(current_conversation, working_memory):
     updated_conversation = current_conversation
     current_conversation_str = ('\n'.join(current_conversation)).strip()
     #observations = think.observe(current_conversation_str, working_memory)
@@ -94,7 +105,7 @@ def demo():
     'Lucid: Dont say anything else..',
     'Edward: What do you mean?',
     "Lucid: Open your fu**ing door.. I'm outside"]
-    cycle(current_conversation, working_memory)
+    thinking_cycle(current_conversation, working_memory)
     
 demo()
 
@@ -105,6 +116,9 @@ def main():
     while True:
         user_input = input('Say: ')
         current_conversation.append(f'Miko: {user_input}')
-        current_conversation, working_memory = cycle(current_conversation, working_memory)
+        current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
         print(current_conversation[-1])
+        
+        
+current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
     
