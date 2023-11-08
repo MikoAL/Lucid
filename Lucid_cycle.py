@@ -28,6 +28,9 @@ def compare_add_working_memory(the_memory, threshold = 0.75):
     query_vector=encoder.encode(the_memory).tolist(),
     limit=1
 )
+    if len(hits) == 0:
+        add_working_memory(the_memory)
+        return the_memory
     for hit in hits:
         info2 = hit.payload['text']
         score = hit.score
@@ -77,19 +80,20 @@ def get_new_working_memory(current_conversation):
     query_vector=encoder.encode(current_conversation_str).tolist(),
     limit=4
 )
-    for hit in hits:
-        info = hit.payload['text']
-        new_working_memory.append(info)
-        delta_time = time.time() - hit.payload['last_recall']
-        if delta_time >= 15.0:
-            recall_count = hit.payload['recall_count']+1
-        else:
-            recall_count = hit.payload['recall_count']
-        working_memory_vector.set_payload(
-            collection_name="working_memory",
-            payload={'recall_count':recall_count, 'last_recall':time.time()},
-            points=hit.vector
-        )
+    if len(hits) != 0:    
+        for hit in hits:
+            info = hit.payload['text']
+            new_working_memory.append(info)
+            delta_time = time.time() - hit.payload['last_recall']
+            if delta_time >= 15.0:
+                recall_count = hit.payload['recall_count']+1
+            else:
+                recall_count = hit.payload['recall_count']
+            working_memory_vector.set_payload(
+                collection_name="working_memory",
+                payload={'recall_count':recall_count, 'last_recall':time.time()},
+                points=hit.vector
+            )
 
     
 
@@ -150,4 +154,3 @@ def main():
         
         
 current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
-    
