@@ -71,7 +71,7 @@ def add_working_memory(the_memory):
     )
     working_memory_idx += 1
 
-def get_new_working_memory(current_conversation):
+def recall_working_memory(current_conversation):
     global working_memory_vector
     new_working_memory = []
     current_conversation_str = '\n'.join(current_conversation)
@@ -94,9 +94,15 @@ def get_new_working_memory(current_conversation):
                 payload={'recall_count':recall_count, 'last_recall':time.time()},
                 points=hit.vector
             )
+    return new_working_memory
 
     
-
+def make_observations_to_working_memory(current_conversation, working_memory):
+    current_conversation_str = ('\n'.join(current_conversation)).strip()
+    observations = think.observe(current_conversation_str, working_memory)
+    observations = compare_add_working_memory(observations)
+    working_memory.append(observations)
+    return working_memory
 
 def thinking_cycle(current_conversation, working_memory):
     #updated_conversation = current_conversation
@@ -142,15 +148,24 @@ def demo():
     
 demo()
 
+# events
+# - init
+# - idle
+# - thinking
+# - user_input
 
 def main():
+    event = 'init'
     working_memory = []
     current_conversation = []
-    while True:
-        user_input = input('Say: ')
-        current_conversation.append(f'Miko: {user_input}')
-        current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
-        print(current_conversation[-1])
+    match event:
+        case 'init':
+            event = 'idle'
+            working_memory = []
+            current_conversation = []
+        case 'idle':
+            current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
+            print(current_conversation[-1])
         
         
 current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
