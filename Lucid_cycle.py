@@ -30,6 +30,7 @@ def compare_add_working_memory(the_memory, threshold = 0.75):
         info2 = hit.payload['text']
         score = hit.score
         info2_id = hit.id
+        info2_recall_count = hit.payload['recall_count']
     
     if score >= threshold:
         combined = think.compare_info(info1, info2)
@@ -39,14 +40,14 @@ def compare_add_working_memory(the_memory, threshold = 0.75):
             models.Record(
                 id=info2_id, # Replacing info2 completely
                 vector=encoder.encode(combined).tolist(),
-                payload= {'text':combined}
+                payload= {'text':combined, 'recall_count':info2_recall_count+1}
             ) 
         ]
     )
-        return 
+        return combined
     else:
         add_working_memory(the_memory)
-        return
+        return the_memory
     
     
 
@@ -59,25 +60,47 @@ def add_working_memory(the_memory):
             models.Record(
                 id=working_memory_idx,
                 vector=encoder.encode(the_memory).tolist(),
-                payload= {'text':the_memory}
+                payload= {'text':the_memory, 'recall_count': 0}
             ) 
         ]
     )
     working_memory_idx += 1
 
+def get_new_working_memory(current_conversation):
+    global working_memory_vector
+    new_working_memory = []
+    current_conversation_str = '\n'.join(current_conversation)
+    hits = working_memory_vector.search(
+    collection_name="working_memory",
+    query_vector=encoder.encode(current_conversation_str).tolist(),
+    limit=4
+)
+    for hit in hits:
+        info = hit.payload['text']
+        new_working_memory.append(info)
+        
+        working_memory_vector.set_payload(
+            collection_name="working_memory",
+            payload={'text':info, 'recall_count':(hit.payload['recall_count']+1)},
+            points=hit.vector
+        )
+
+    
+
 
 def thinking_cycle(current_conversation, working_memory):
-    updated_conversation = current_conversation
+    #updated_conversation = current_conversation
     current_conversation_str = ('\n'.join(current_conversation)).strip()
     #observations = think.observe(current_conversation_str, working_memory)
     five_w_one_h = think.five_w_one_h(current_conversation_str, working_memory)
+    five_w_one_h = compare_add_working_memory(five_w_one_h)
     working_memory.append(five_w_one_h)
-    add_working_memory(five_w_one_h)
+    
     
     observations = think.observe(current_conversation_str, working_memory)
+
+    observations = compare_add_working_memory(observations)
     working_memory.append(observations)
-    add_working_memory(observations)
-    
     #print(f'five_w_one_h: {five_w_one_h}')
     #print(f'observations: {observations}')
 

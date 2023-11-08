@@ -124,7 +124,7 @@ def whys(current_conversation, working_memory, init_statement, depth = 3):
         question = statement+' Why?'
         question_process.append(question)
         request = f"""{current_conversation}
-Answer the question logically and in an objective mammer in one sentence only. Be very concise.
+Answer the question logically and in an objective mammer in one sentence only. Be very concise. Start with the word 'Because'.
 {question}"""
 
         prompt = build_prompt(working_memory, request)
