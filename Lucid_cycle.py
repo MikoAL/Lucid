@@ -173,7 +173,8 @@ from collections import deque
 #current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
 priority_queue = deque(['init'])
 normal_queue = deque()
-
+# level: system, 
+# command: idle, converse, think
 def process_queue():
     global priority_queue
     global normal_queue
@@ -192,6 +193,8 @@ def process_queue():
         case 'init':
             working_memory = []
             current_conversation = []
+            
             pass
         case 'idle':
+            normal_queue.append('action')
             pass
