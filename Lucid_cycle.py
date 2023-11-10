@@ -165,9 +165,33 @@ def main():
             current_conversation = []
         case 'idle':
             current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
-            print(current_conversation[-1])
+            #print(current_conversation[-1])
         case 'action':
             pass
         
-        
-current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
+from collections import deque
+#current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
+priority_queue = deque(['init'])
+normal_queue = deque()
+
+def process_queue():
+    global priority_queue
+    global normal_queue
+    global working_memory
+    global current_conversation
+    
+    if len(priority_queue) != 0:
+        command = priority_queue.popleft()
+    elif len(normal_queue) != 0:
+        command = normal_queue.popleft()
+    else:
+        normal_queue.append('idle')
+        return
+    
+    match command:
+        case 'init':
+            working_memory = []
+            current_conversation = []
+            pass
+        case 'idle':
+            pass
