@@ -155,17 +155,19 @@ demo()
 # - user_input
 
 def main():
-    event = 'init'
+    state = 'init'
     working_memory = []
     current_conversation = []
-    match event:
+    match state:
         case 'init':
-            event = 'idle'
+            state = 'idle'
             working_memory = []
             current_conversation = []
         case 'idle':
             current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
             print(current_conversation[-1])
+        case 'action':
+            pass
         
         
 current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)

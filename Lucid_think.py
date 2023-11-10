@@ -147,9 +147,9 @@ Based on the conversation provided, please provide short but comprehensive infor
     
     return questions
 
-statement, process = whys([],[],'The sky is blue.')    
-print(statement)
-print('\n\n'.join(process))
+#statement, process = whys([],[],'The sky is blue.')    
+#print(statement)
+#print('\n\n'.join(process))
     
 #class GenerateThought:
 #    def __init__(self, custom_prompt):
