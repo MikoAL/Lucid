@@ -20,9 +20,30 @@ working_memory_vector.recreate_collection(
     )
 )
 
+class memory:
+    def __init__(self, text):
+        self.text = text
+        self.recall_count = 0
+        self.last_recall_time = time.time()
+        #global working_memory_vector
+        global working_memory_idx
+        working_memory_vector.upload_records(
+            collection_name="working_memory",
+            records=[
+                models.Record(
+                    id=working_memory_idx,
+                    vector=encoder.encode(self.text).tolist(),
+                    payload= {'text':self.text, 'recall_count': self.recall_count, 'last_recall':self.last_recall_time}
+                ) 
+            ]
+        )
+        working_memory_idx += 1
+
+        
+
 def compare_add_working_memory(the_memory, threshold = 0.75):
     global working_memory_vector
-    info1 = the_memory
+    info1 = the_memory.text
     hits = working_memory_vector.search(
     collection_name="working_memory",
     query_vector=encoder.encode(the_memory).tolist(),
@@ -51,7 +72,7 @@ def compare_add_working_memory(the_memory, threshold = 0.75):
     )
         return combined
     else:
-        add_working_memory(the_memory)
+        memory()
         return the_memory
     
     
