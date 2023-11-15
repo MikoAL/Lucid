@@ -102,7 +102,7 @@ def recall_working_memory(current_conversation):
 def make_observations_to_working_memory(current_conversation, working_memory):
     current_conversation_str = ('\n'.join(current_conversation)).strip()
     observations = think.observe(current_conversation_str, working_memory)
-    observations = compare_add_working_memory(observations)
-    working_memory.append(observations)
+    observations = memory(observations)
+    working_memory.append(observations.text)
     return working_memory
 
