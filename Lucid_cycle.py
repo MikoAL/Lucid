@@ -54,30 +54,23 @@ def demo():
     
 demo()
 
+import Lucid_think as think
+import Lucid_classification as classification
+import time
 # events
 # - init
 # - idle
 # - thinking
 # - user_input
 
-def main():
-    state = 'init'
-    working_memory = []
-    current_conversation = []
-    match state:
-        case 'init':
-            state = 'idle'
-            working_memory = []
-            current_conversation = []
-        case 'idle':
-            current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
-            #print(current_conversation[-1])
-        case 'action':
-            pass
-        
+class command:
+    def __init__(self, type, action):
+        self.type = type
+        self.action = action
+        self.timestamp = time.time()
 from collections import deque
 #current_conversation, working_memory = thinking_cycle(current_conversation, working_memory)
-priority_queue = deque(['init'])
+priority_queue = deque([])
 normal_queue = deque()
 # level: system, 
 # command: idle, converse, think
