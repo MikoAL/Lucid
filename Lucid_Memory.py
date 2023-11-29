@@ -1,5 +1,6 @@
 import Lucid_think as think
 import Lucid_classification as classification
+import Lucid_generation as generation
 
 from qdrant_client import models, QdrantClient
 from sentence_transformers import SentenceTransformer
@@ -41,7 +42,7 @@ class memory:
         working_memory_idx += 1
     def check_and_upload_to_vector(self, threshold = 0.75):
         global working_memory_idx
-        # Check for simulars first
+        # Check for similars first
         global working_memory_vector
         hits = working_memory_vector.search(
         collection_name="working_memory",
