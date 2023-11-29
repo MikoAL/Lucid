@@ -20,7 +20,7 @@ working_memory_vector.recreate_collection(
         distance=models.Distance.COSINE
     )
 )
-
+keyword_dict = {}
 class memory:
     def __init__(self, text):
         self.text = text
