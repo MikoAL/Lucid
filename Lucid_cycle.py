@@ -1,7 +1,7 @@
 
 import time
 
-
+import json
 
 import Lucid_think as think
 import Lucid_classification as classification
@@ -11,6 +11,9 @@ import time
 # - idle
 # - thinking
 # - user_input
+f = open(r"C:\Users\User\Desktop\Projects\Lucid\dictionary\dictionary.json")
+dictionary = json.load(f)
+
 class incoming:
     def __init__(self, text, source):
         self.text = text
@@ -18,9 +21,14 @@ class incoming:
         self.keywords = classification.keywords(text)
         self.timestamp = time.time()
     def extract_info_on_keywords(self):
+        global dictionary
         if len(self.keywords) != 0:
-            for i in self.keywords:
-                
+            for keyword in self.keywords:
+                if keyword in dictionary:
+                    dictionary[keyword]['recall_counter'] += 1
+                    
+                else:
+                    dictionary[keyword] = {'recall_counter':0, 'description':'There is no info on this keyword.'}
         else:
             return
         

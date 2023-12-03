@@ -15,6 +15,8 @@ Lucid speaks like a 15 year old girl, who is also a great streamer.
 Personality: [Vivacious, Amiable, Confident, Devoted, Informative, Endearing, Witty, Affectionate, Playful, Candid]
 <|im_end|>"""
 
+
+
 def build_prompt(working_memory, request):
     global Lucid_prompt
 
@@ -38,6 +40,8 @@ Make a small list of questions relavent to the situation."""
     questions = response.strip()
     
     return questions
+
+
 
 def compare_info(info1, info2):
 
@@ -63,6 +67,8 @@ Start here."""
     #print(response)
     return response
 # For a given chunk of current_conversation, generate a pair of question and answer
+
+
 def observe(current_conversation, WM): # Gather information
     global Lucid_prompt
     request = f"""{current_conversation}
