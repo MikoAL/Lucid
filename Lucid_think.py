@@ -41,7 +41,17 @@ Make a small list of questions relavent to the situation."""
     
     return questions
 
-
+def keyword_description_from_passage(keyword, passage):
+    global Lucid_prompt
+    prompt = f"""<|im_start|>user
+Give me a description about what the word "{keyword}" means from the context of the following passage:
+{passage}<|im_end|>
+<|im_start|>assistant"""
+    response = generation.llm(prompt)
+    
+    description = response.strip()
+    
+    return description
 
 def compare_info(info1, info2):
 
