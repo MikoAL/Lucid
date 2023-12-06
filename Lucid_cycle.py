@@ -6,6 +6,7 @@ import json
 import Lucid_think as think
 import Lucid_classification as classification
 import time
+import Lucid_memory as memory
 # events
 # - init
 # - idle
@@ -77,3 +78,5 @@ def process_queue():
         case 'idle':
             normal_queue.append('action')
             pass
+        
+        

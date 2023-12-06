@@ -44,7 +44,7 @@ Make a small list of questions relavent to the situation."""
 def keyword_description_from_passage(keyword, passage):
     global Lucid_prompt
     prompt = f"""<|im_start|>user
-Give me a description about what the word "{keyword}" means from the context of the following passage:
+Give me a description about what the word "{keyword}" means, from the context of the following passage:
 {passage}<|im_end|>
 <|im_start|>assistant"""
     response = generation.llm(prompt)
@@ -82,7 +82,7 @@ Start here."""
 def observe(current_conversation, WM): # Gather information
     global Lucid_prompt
     request = f"""{current_conversation}
-Make a small list of crucial observations about the above conversation. These observations would affect decision making and the observations should be understood without context. Be concise."""
+Make a small list of crucial observations about the above conversation. These observations would affect decision making, and the observations should be understood without context. Be concise."""
 
     prompt = build_prompt(WM, request)  
 
@@ -109,6 +109,13 @@ def converse(current_conversation, WM):
     response = generation.llm(prompt)
     
     return response
+
+def predict(current_conversation, WM):
+    request = f"{current_conversation}\nAbove is the current conversation, based on the current situation, give a speculation and prediction of what will most likely happen. Start with the phrase 'What will most likely happen is'."
+    prompt = build_prompt(WM, request)
+    prediction = generation.llm(prompt)
+    return prediction
+
 def demo():
     current_conversation = """Edward: Lucid, I think I'm in love with Bella.. 
     Lucid: Dont say anything else.. 

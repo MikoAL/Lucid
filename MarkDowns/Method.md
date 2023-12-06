@@ -8,14 +8,20 @@ There are many different types of memory,
 
 And all these have two types of info stored in them
 - Episodic
-- Semantic
+- Semantic 
+
+For semantic memory, I have chosen a "keyword dictionary" solution. Very much inspired by the ["Lorebook"](https://rentry.co/SillyT_Lorebook#scope-and-purpose) concept of having keywords that when mentioned, gives an explanation of what it means. The difference between lorebooks and my keyword dictionary lies in the fact that the keyword dictionary updates itself, instead of having to be hand made.
+
+# Episodic-Memory
+
+For episodic memory, it it a WIP.
+Below is basically all the info I have on episodic memories.
 
 https://www.medicalnewstoday.com/articles/types-of-memory
 
 # Choosing-Memory-to-Store
 Choosing which part of a state should be stored, the first thing that may come to mind is to store everything,
-I mean it is a computer, right? While that may makes sense at first glance, it will create the problem of clutter for the AI's memory. We can still keep a log of what happened, but it will not be the main part of the
-memory storing system.
+I mean it is a computer, right? While that may makes sense at first glance, it will create the problem of clutter for the AI's memory. We can still keep a log of what happened, but it will not be the main part of the memory storing system.
 
 Humans usually stores a few types of situations: 
 - highly emotional situations

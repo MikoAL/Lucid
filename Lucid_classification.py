@@ -14,7 +14,9 @@ def message_type_classification(sentence: str):
     message_types = ["command", "chit-chat", "question", "greeting", "feedback", "information", "problem"]
     return  zeroshot_classification(sentence, message_types)['labels'][0]
 
-
+def positive_negative_classification(sentence: str):
+    types = ['positive','neutral','negative']
+    return zeroshot_classification(sentence, types)['labels'][0]
 
 
     
