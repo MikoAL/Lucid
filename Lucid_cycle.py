@@ -3,10 +3,13 @@ import time
 
 import json
 
+import random
+
 import Lucid_think as think
 import Lucid_classification as classification
 import time
 import Lucid_memory as memory
+#import Lucid_generation as generation
 # events
 # - init
 # - idle
@@ -44,8 +47,8 @@ class incoming:
         
         
 class command:
-    def __init__(self, type, action):
-        self.type = type
+    def __init__(self, state, action):
+        self.state = state
         self.action = action
         self.timestamp = time.time()
 
@@ -78,5 +81,62 @@ def process_queue():
         case 'idle':
             normal_queue.append('action')
             pass
+
+def random_action():
+    choices = ['observe', 'plan_action', 'predict']
+    finale_choice = random.choice(choices)
+    match finale_choice:
+        case 'observe':
+            return {'role': 'system','content':f"""Observation: {think.observe()}"""}
+        case 'plan_action':
+            return {'role': 'system','content':f"""Action Plan: {think.plan_action()}"""}
+        case 'predict':
+            return {'role': 'system','content':f"""Prediction: {think.predict()}"""}
+    return
         
+def style_convertor(conversation_dict_list, style):
+    if type(conversation_dict_list) == dict:
+        conversation_dict_list = [conversation_dict_list]
+    match style:
+        case 'chatml':
+            conversation_chatml = ''
+            for i in conversation_dict_list:
+                conversation_chatml += f"""<|im_start|>{i['role']}\n{i['content']}<|im_end|>\n"""
+                return conversation_chatml.strip()
+        case 'prompt':
+            conversation_prompt = ''
+            for i in conversation_dict_list:
+                conversation_prompt += f"""{i['role']}: {i['content']}\n"""
+                return conversation_prompt.strip()
+    return
+                
+def say_out(text):
+    print(text)
+                
+            
+
+
+running = True
+incoming_messages = []
+state = ''
+working_memory = []
+current_conversation = []
+while running():
+    
+    if len(incoming_messages) != 0:
+        
+        for msg in incoming_messages:
+            
+            state = 'generating_response'
+            current_conversation.append({'role':msg['source'],'content':msg['text']})
+            #action_results = random_action()
+            #working_memory.append(action_results['content'])
+            sentance_plan = think.plan_sentence()
+            working_memory.append(sentance_plan)
+            think.converse(style_convertor(current_conversation, 'chatml'))
+            
+            
+    else:
+        state = 'idle'
+    
         

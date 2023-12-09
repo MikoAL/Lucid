@@ -3,6 +3,7 @@ import Lucid_generation as generation
 
 import json
 
+
 Lucid_prompt = """<|im_start|>system
 You are Lucid, a female AI assistant created by a boy named Miko.
 
@@ -90,9 +91,9 @@ Make a small list of crucial observations about the above conversation. These ob
 
     observations = response
     
-    return observations
+    return observations.strip()
 
-def action(current_conversation, WM):
+def plan_action(current_conversation, WM):
     global Lucid_prompt
     #global working_memory
     thought = ''
@@ -102,19 +103,35 @@ What will you do next as Lucid? Start with the phrase 'I should'. Be concise. Sp
     thought = generation.llm(prompt)
     return thought.strip()
 
-def converse(current_conversation, WM):
-    
-    request = f"{current_conversation}\nAbove is the current conversation, based on the current conversation and Lucid's working memory and personality, generate a response as Lucid."
+def plan_sentence(current_conversation, WM):
+    global Lucid_prompt
+    #global working_memory
+    thought = ''
+    request = f"""{current_conversation}
+What message should Lucid communicate next? Begin with the phrase 'In my next sentence, I should convey the idea that'. Keep it short and specify the type of message and tone you are going for."""
     prompt = build_prompt(WM, request)
+    thought = generation.llm(prompt)
+    return thought.strip()
+
+def converse(conversation_chatml, WM):
+    global Lucid_prompt
+
+    prompt = f"""{Lucid_prompt}
+    <|im_start|>system
+    This is Lucid's current working memory, it includes her observations and thoughts.
+    {WM}<|im_end|>
+    {conversation_chatml}
+    <|im_start|>assistant"""
+
     response = generation.llm(prompt)
     
-    return response
+    return response.strip()
 
 def predict(current_conversation, WM):
     request = f"{current_conversation}\nAbove is the current conversation, based on the current situation, give a speculation and prediction of what will most likely happen. Start with the phrase 'What will most likely happen is'."
     prompt = build_prompt(WM, request)
     prediction = generation.llm(prompt)
-    return prediction
+    return prediction.strip()
 
 def demo():
     current_conversation = """Edward: Lucid, I think I'm in love with Bella.. 
@@ -132,7 +149,7 @@ def demo():
 
     working_memory.append(relevant_question_list)
 
-    actions = action(current_conversation, working_memory)
+    actions = plan_action(current_conversation, working_memory)
 
     print(f'observations: {observations}')
 
