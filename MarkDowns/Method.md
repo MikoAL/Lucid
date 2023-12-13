@@ -35,6 +35,10 @@ Any situation that fits at least one of these catagories shall be saved.
 # Storing-Memories
 The storing and labeling of memories, the first thing that may come to mind is a sentence simularity search with a vector database. Not a bad idea, but it has a few shortcomings. Mainly, what is similar may not be what you want to retrieve. But that is a retrieval problem, or a future me's problem.
 
+2 step sorting algo
+idea: first use semantic models to cluster similar ones together and label them as groups
+second, use
+
 # Retriving-Memories
 Future me here, or I guess, current me, maybe past me? Anyways that's not the point.
 Since the human brain most likely has multiple "agents" doing different parts of being human, the point of the retrieval agent is to get the relevant information for the other agents. So the other agents have to learn to give out requests.

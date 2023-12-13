@@ -113,28 +113,38 @@ def style_convertor(conversation_dict_list, style):
 def say_out(text):
     print(text)
                 
-            
+def check_for_incoming_messages():
+    
+    return [{'type':'message','source':'Miko','content':'this is a test message.'}]
 
 
 running = True
-incoming_messages = []
+mailbox = []
 state = ''
 working_memory = []
 current_conversation = []
 while running():
-    
-    if len(incoming_messages) != 0:
-        
-        for msg in incoming_messages:
-            
-            state = 'generating_response'
-            current_conversation.append({'role':msg['source'],'content':msg['text']})
+    mailbox = check_for_incoming_messages()
+    new_messages = []
+    for mail in mailbox:
+        if mail['type'] == 'message':
+            new_messages.append({'role':mail['source'], 'content':mail['content']})
+    mailbox = []
+    if len(new_messages) != 0:
+        state = 'generating_response'
+        for msg in new_messages:
+            current_conversation.append(msg)
             #action_results = random_action()
             #working_memory.append(action_results['content'])
-            sentance_plan = think.plan_sentence()
-            working_memory.append(sentance_plan)
-            think.converse(style_convertor(current_conversation, 'chatml'))
-            
+        new_messages = []
+        sentance_plan = think.plan_sentence()
+        working_memory.append(sentance_plan)
+        temp = think.converse(style_convertor(current_conversation, 'chatml'))
+        temp = think.converse(temp, working_memory)
+        state = 'stating_response'
+        say_out(temp)
+        current_conversation.append({'role':'assistant', 'content':temp})
+        
             
     else:
         state = 'idle'

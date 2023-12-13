@@ -108,7 +108,7 @@ def plan_sentence(current_conversation, WM):
     #global working_memory
     thought = ''
     request = f"""{current_conversation}
-What message should Lucid communicate next? Begin with the phrase 'In my next sentence, I should convey the idea that'. Keep it short and specify the type of message and tone you are going for."""
+What message should Lucid communicate next? Begin with the phrase 'In my next sentence, I should convey the idea that'. Keep it short and specify the type of message and tone you are going for. It is also ok to plan to stay silent."""
     prompt = build_prompt(WM, request)
     thought = generation.llm(prompt)
     return thought.strip()

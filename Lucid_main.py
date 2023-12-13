@@ -2,7 +2,7 @@ import Lucid_generation as generation
 import Lucid_preprocess as preprocess
 import Lucid_postprocess as postprocess
 import Lucid_memory as memory
-import Lucid_emotion_detection as emotion_detection
+
 #import Lucid_autistic as autisitc
 #import Lucid_server as server
 import Lucid_classification as classification
