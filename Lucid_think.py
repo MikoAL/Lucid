@@ -115,11 +115,15 @@ What message should Lucid communicate next? Begin with the phrase 'In my next se
 
 def converse(conversation_chatml, WM):
     global Lucid_prompt
-
+    working_memory_prompt = ''
+    if len(WM) != 0:
+        for mem in WM:
+            working_memory_prompt += f"- {mem}\n"
+    working_memory_prompt = working_memory_prompt.strip()  
     prompt = f"""{Lucid_prompt}
     <|im_start|>system
     This is Lucid's current working memory, it includes her observations and thoughts.
-    {WM}<|im_end|>
+    {working_memory_prompt}<|im_end|>
     {conversation_chatml}
     <|im_start|>assistant"""
 
