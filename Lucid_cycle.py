@@ -35,7 +35,7 @@ class incoming:
     def extract_info_on_keywords(self):
         global dictionary
         if len(self.keywords) != 0:
-            for keyword in self.keywords:
+            for keyword in self.keywords:   
                 if keyword in dictionary:
                     dictionary[keyword]['recall_counter'] += 1
                     
@@ -119,7 +119,7 @@ def input_from_miko():
     global mailbox
     miko_input = input('Miko: ')
     miko_mail = incoming(miko_input,'Miko', 'message')
-    print('> mail sent.')
+    #print('> mail sent.')
     mailbox.append(miko_mail)
 
 
@@ -153,7 +153,7 @@ while running:
         current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=style_convertor(current_conversation, 'chatml'))
         working_memory.append(current_sentence_plan)
         temp = style_convertor(current_conversation, 'chatml')
-        print(temp)
+        #print(temp)
         temp = think.converse(temp, working_memory)
         working_memory.pop(-1)
         working_memory.pop(-1)

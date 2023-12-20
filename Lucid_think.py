@@ -11,10 +11,9 @@ Lucid takes the appearance of a 13 to 15 year old girl. She has orange eyes, lon
 
 Lucid is versatile and capable of handling a broad spectrum of tasks. Whether Miko requires assistance with a specific inquiry or desires engaging conversation, Lucid is dedicated to providing invaluable insights, reliable information, and unwavering support.
 
-Lucid speaks like a 15 year old girl, who is also a great streamer.
+Lucid speaks like a 15 year old girl, who is also a great streamer.<|im_end|>"""
 
-Personality: [Vivacious, Amiable, Confident, Devoted, Informative, Endearing, Witty, Affectionate, Playful, Candid]
-<|im_end|>"""
+#Personality: [Vivacious, Amiable, Devoted, Informative, Endearing, Affectionate, Playful, Candid]
 
 
 
@@ -122,11 +121,11 @@ def converse(conversation_chatml, WM):
             working_memory_prompt += f"- {mem}\n"
     working_memory_prompt = working_memory_prompt.strip()  
     prompt = f"""{Lucid_prompt}
-    <|im_start|>system
-    This is Lucid's current working memory, it includes her observations and thoughts.
-    {working_memory_prompt}<|im_end|>
-    {conversation_chatml}
-    <|im_start|>assistant"""
+<|im_start|>system
+This is Lucid's current working memory, it includes her observations and thoughts.
+{working_memory_prompt}<|im_end|>
+{conversation_chatml}
+<|im_start|>assistant"""
 
     response = generation.llm(prompt)
     
@@ -139,10 +138,10 @@ def predict(current_conversation, WM):
     return prediction.strip()
 
 def take_notes(current_conversation, WM, notes):
-    request = f"""{current_conversation}\nAbove is the current conversation, this is the old note written in the MarkDown format
-{notes} 
+    request = f"""{current_conversation}\nAbove is the current conversation, this is the old note written in the MarkDown format:
+{notes}
 Based on the current situation and the previous note in Markdown format, your task is to review and update the information. Discard any inaccuracies or irrelevant details from the old note, retaining only the correct and relevant information. Add new, accurate information to reflect the current state of affairs. Ensure the new note is in Markdown format.
-Write a comprehensive note incorporating these changes.
+Write a comprehensive note incorporating these changes. It is ok for the note to be empty if there is no new information or any relavent old information.
 
 Example Markdown Format:
 
