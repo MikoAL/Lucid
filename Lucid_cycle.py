@@ -126,6 +126,8 @@ state = ''
 working_memory = []
 current_conversation = []
 current_sentence_plan = ''
+notes = ''
+
 while running:
     input_from_miko()
     if len(mailbox) != 0:
@@ -141,11 +143,15 @@ while running:
             #action_results = random_action()
             #working_memory.append(action_results['content'])
         new_messages = []
+        notes = ''
+        notes = think.take_notes(current_conversation=current_conversation, WM=working_memory, notes=notes)
+        working_memory.append(notes)
         current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=current_conversation)
         working_memory.append(current_sentence_plan)
         temp = style_convertor(current_conversation, 'chatml')
         print(temp)
         temp = think.converse(temp, working_memory)
+        working_memory.pop(-1)
         working_memory.pop(-1)
         state = 'stating_response'
         say_out(temp)

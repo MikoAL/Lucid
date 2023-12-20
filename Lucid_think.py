@@ -28,6 +28,7 @@ This is Lucid's current working memory, it includes her observations and thought
 <|im_start|>user
 {request}<|im_end|>
 <|im_start|>assistant"""
+
     return prompt
 
 def relevant_questions(current_conversation, working_memory):
@@ -136,6 +137,25 @@ def predict(current_conversation, WM):
     prompt = build_prompt(WM, request)
     prediction = generation.llm(prompt)
     return prediction.strip()
+
+def take_notes(current_conversation, WM, notes):
+    request = f"""{current_conversation}\nAbove is the current conversation, this is the old note written in the MarkDown format
+{notes} 
+Based on the current situation and the previous note in Markdown format, your task is to review and update the information. Discard any inaccuracies or irrelevant details from the old note, retaining only the correct and relevant information. Add new, accurate information to reflect the current state of affairs. Ensure the new note is in Markdown format.
+Write a comprehensive note incorporating these changes.
+
+Example Markdown Format:
+
+**Note:**
+- Updated information 1
+- Updated information 2
+- Retained relevant information from the old note
+- Corrected inaccuracies
+
+Make sure to follow the Markdown syntax for proper formatting."""
+    prompt = build_prompt(WM, request)
+    new_note = generation.llm(prompt)
+    return new_note.strip()
 
 def demo():
     current_conversation = """Edward: Lucid, I think I'm in love with Bella.. 
