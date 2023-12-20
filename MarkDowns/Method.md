@@ -46,3 +46,9 @@ Since the human brain most likely has multiple "agents" doing different parts of
 The retrieval agent has access to the current situation and past memories, based on these two factors, it will list the information we need for the current situation, and then we can see what info is in our working memory, to see if a retrieval is necessary.
 
 
+# Profiles
+Using the idea of profiles.
+each profile represents a thing, event, person etc.
+with a description and info about it.
+
+

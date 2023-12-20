@@ -24,12 +24,14 @@ def save_dictionary():
     global dictionary
     with open(dictionary_path, 'w', encoding='utf-8') as f:
         json.dump(dictionary, f, ensure_ascii=False, indent=4)
+        
 class incoming:
-    def __init__(self, text, source):
+    def __init__(self, text, source, type):
         self.text = text
         self.source = source
         self.keywords = classification.keywords(text)
         self.timestamp = time.time()
+        self.type = type
     def extract_info_on_keywords(self):
         global dictionary
         if len(self.keywords) != 0:
@@ -111,12 +113,14 @@ def style_convertor(conversation_dict_list, style):
     return
                 
 def say_out(text):
-    print(text)
+    print(f"Lucid: {text}")
                 
 def input_from_miko():
     global mailbox
     miko_input = input('Miko: ')
-    mailbox.append({'type':'message','source':'Miko','content':miko_input})
+    miko_mail = incoming(miko_input,'Miko', 'message')
+    print('> mail sent.')
+    mailbox.append(miko_mail)
 
 
 
@@ -133,8 +137,8 @@ while running:
     if len(mailbox) != 0:
         new_messages = []
         for mail in mailbox:
-            if mail['type'] == 'message':
-                new_messages.append({'role':mail['source'], 'content':mail['content']})
+            if mail.type == 'message':
+                new_messages.append({'role':mail.source, 'content':mail.text})
         mailbox = []
     if len(new_messages) != 0:
         state = 'generating_response'
