@@ -148,9 +148,9 @@ while running:
             #working_memory.append(action_results['content'])
         new_messages = []
         notes = ''
-        notes = think.take_notes(current_conversation=current_conversation, WM=working_memory, notes=notes)
+        notes = think.take_notes(current_conversation=style_convertor(current_conversation, 'chatml'), WM=working_memory, notes=notes)
         working_memory.append(notes)
-        current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=current_conversation)
+        current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=style_convertor(current_conversation, 'chatml'))
         working_memory.append(current_sentence_plan)
         temp = style_convertor(current_conversation, 'chatml')
         print(temp)
