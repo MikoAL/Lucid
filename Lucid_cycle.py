@@ -155,8 +155,9 @@ while running:
         temp = style_convertor(current_conversation, 'chatml')
         #print(temp)
         temp = think.converse(temp, working_memory)
-        working_memory.pop(-1)
-        working_memory.pop(-1)
+        #working_memory.pop(-1)
+        #working_memory.pop(-1)
+        working_memory = []
         state = 'stating_response'
         say_out(temp)
         current_conversation.append({'role':'assistant', 'content':temp})
