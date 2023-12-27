@@ -156,13 +156,17 @@ def take_notes(current_conversation, WM, notes):
 Based on the current situation and the previous note in Markdown format, your task is to review and update the information. Discard any inaccuracies or irrelevant details from the old note, retaining only the correct and relevant information. Add new, accurate information to reflect the current state of affairs. Ensure the new note is in Markdown format.
 Write a comprehensive note incorporating these changes. It is ok for the note to be empty if there is no new information or any relavent old information.
 
-Example Markdown Format:
+Markdown Format Example:
 
-**Note:**
-- Updated information 1
-- Updated information 2
-- Retained relevant information from the old note
-- Corrected inaccuracies
+**Note**
+- An Updated information 1
+- An Updated information 2
+- A Retained relevant information from the old note
+- Some Corrected inaccuracies
+
+**Note**
+- a new piece of information 
+- an old but relevant information
 
 Make sure to follow the Markdown syntax for proper formatting."""
     prompt = build_prompt(WM, request)

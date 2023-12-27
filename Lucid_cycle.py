@@ -1,6 +1,6 @@
 
 import time
-
+from datetime import date
 import json
 
 import random
@@ -108,7 +108,7 @@ def style_convertor(conversation_dict_list, style):
         case 'prompt':
             conversation_prompt = ''
             for i in conversation_dict_list:
-                conversation_prompt += f"""{i['role']}: {i['content']}\n"""
+                conversation_prompt += f"""[{date.fromtimestamp(i['timestamp'])}]{i['role']}: {i['content']}\n"""
             return conversation_prompt.strip()
     return
                 
@@ -138,7 +138,7 @@ while running:
         new_messages = []
         for mail in mailbox:
             if mail.type == 'message':
-                new_messages.append({'role':mail.source, 'content':mail.text})
+                new_messages.append({'role':mail.source, 'content':mail.text, 'timestamp':mail.timestamp})
         mailbox = []
     if len(new_messages) != 0:
         state = 'generating_response'
@@ -149,7 +149,7 @@ while running:
         new_messages = []
         notes = ''
         notes = think.take_notes(current_conversation=style_convertor(current_conversation, 'chatml'), WM=working_memory, notes=notes)
-        working_memory.append(notes)
+        #working_memory.append(notes)
         current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=style_convertor(current_conversation, 'chatml'))
         working_memory.append(current_sentence_plan)
         temp = style_convertor(current_conversation, 'chatml')
