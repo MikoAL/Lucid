@@ -1,1 +1,15 @@
-{"test":"test"}
+{
+    "test": "test",
+    "keyword extraction": {
+        "recall_counter": 0,
+        "description": "In the given context, \"keyword extraction\" refers to a process or system that is designed to identify and select the most significant, relevant, or meaningful terms from a piece of text or document. These extracted keywords help in summarizing or categorizing the content for various purposes such as indexing, search engine optimization, or text analysis. In the passage, the mention of \"keyword extraction system thingy\" implies that a system or software has been developed to automatically extract keywords from texts."
+    },
+    "json file": {
+        "recall_counter": 0,
+        "description": "In the given context, the term \"json file\" refers to a file format, specifically called JSON (JavaScript Object Notation), which is used for storing and exchanging data in a structured and human-readable format. This format is often utilized for data exchange between software applications or for data storage in various programming languages. In this specific passage, \"the correct info\" has been successfully saved to this JSON file, indicating that the correct data has been added or updated in this particular file format."
+    },
+    "dictionary function": {
+        "recall_counter": 0,
+        "description": "A \"dictionary function\" is a feature added to the code that enables users to search for information in a specified database or source, providing relevant data in response to queries. This function can be customized to prioritize recent sources, present diverse perspectives, exclude irrelevant details, and retain conflicting sources to ensure accuracy and comprehensiveness. It enables users to access information efficiently and effectively, fulfilling their information needs.\n\nIn the provided passage, Lucid expresses excitement about Miko's recent addition of a dictionary function, which will help users search for information within specified databases or sources efficiently. By prioritizing recent sources, presenting diverse perspectives, and excluding irrelevant details, the function ensures accurate and comprehensive information. This enhances interactions and allows users to explore new topics and ideas effectively."
+    }
+}

@@ -55,12 +55,21 @@ Make a small list of questions relavent to the situation."""
     
     return questions
 
-def keyword_description_from_passage(keyword, passage):
+def keyword_description_from_passage(keyword, passage, previous_description = 'N/A'):
     global Lucid_prompt
-    prompt = f"""<|im_start|>user
-Give me a description about what the word "{keyword}" means, from the context of the following passage:
-{passage}<|im_end|>
-<|im_start|>assistant"""
+    prompt = f"""user:
+- Prioritize recent sources.
+- Present diverse perspectives with proper attributions.
+- Exclude irrelevant details.
+- Retain conflicting sources unless they contain factual errors.
+- Avoid unilaterally affirming one source; exceptions for factual inaccuracies.
+
+old description of "{keyword}": {previous_description}
+
+Provide a description of "{keyword}" that combines the previous definition with insights from the following passage. It's acceptable if the meaning is unclear:
+{passage}
+assistant:
+"""
     response = generation.llm(prompt)
     
     description = response.strip()
@@ -138,7 +147,8 @@ def converse(conversation_chatml, WM):
 This is Lucid's current working memory, it includes her observations and thoughts.
 {working_memory_prompt}<|im_end|>
 {conversation_chatml}
-<|im_start|>assistant"""
+<|im_start|>assistant:
+"""
 
     response = generation.llm(prompt)
     
