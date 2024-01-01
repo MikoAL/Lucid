@@ -12,12 +12,12 @@ headers = {
 # For reverse-proxied streaming, the remote will likely host with ssl - https://
 # URI = 'https://your-uri-here.trycloudflare.com/api/v1/generate'
 
-def llm(prompt):
+def llm(prompt,temperature=1.5):
     global host, url, headers
     request = {
     "prompt": prompt,
     "max_tokens": 2000,
-    "temperature": 1,
+    "temperature": temperature,
     "top_p": 0.9,
     "seed": 10,
     "stream": False,

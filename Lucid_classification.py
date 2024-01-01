@@ -47,5 +47,13 @@ def positive_negative_classification(sentence: str):
     types = ['positive','neutral','negative']
     return zeroshot_classification(sentence, types)['labels'][0] 
 
+def stay_silent(sentence: str):
+    types = ['stay silent', 'converse']
+    if zeroshot_classification(sentence, types)['labels'][0] == 'stay silent':
+        return True
+    else:
+        return False
+
+
 #print(keyword_extractor('New systems are online now, yay, I hope so anyways, it is a keyword extraction system thingy'))
     

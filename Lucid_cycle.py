@@ -171,15 +171,15 @@ while running:
         notes = think.take_notes(current_conversation=current_conversation_style_convertor(current_conversation, 'chatml'), WM=working_memory, notes=notes)
 
         current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=current_conversation_style_convertor(current_conversation, 'chatml'))
-        working_memory.append(current_sentence_plan)
-        temp = current_conversation_style_convertor(current_conversation, 'chatml')
-
-        temp = think.converse(temp, working_memory)
-
+        if classification.stay_silent(current_sentence_plan) != True:
+            working_memory.append(current_sentence_plan)
+            temp = current_conversation_style_convertor(current_conversation, 'chatml')
+            temp = think.converse(temp, working_memory)
+            state = 'stating_response'
+            say_out(temp)
+        else:
+            temp = ''
         working_memory = []
-        state = 'stating_response'
-        say_out(temp)
-        
         current_conversation.append(conversation_message(text=temp, source='Lucid', type='message'))
         while len(current_conversation) > 4:
             current_conversation.pop(0)
