@@ -113,7 +113,7 @@ def current_conversation_style_convertor(conversation_message_list, style):
         key_list = list(set(key_list))
         dictionary_prompt = '<|im_start|>system\nDictionary. Entries may contain inaccurate definitions.\n'
         for key in key_list:
-            dictionary_prompt += f'{key}\n: {dictionary[key]}\n\n'
+            dictionary_prompt += f'{key}\n: {dictionary[key]["description"]}\n\n'
         dictionary_prompt += '<|im_end|>\n'
         
     
@@ -127,22 +127,23 @@ def current_conversation_style_convertor(conversation_message_list, style):
             conversation_prompt = ''
             for i in conversation_message_list:
                 conversation_prompt += f"""[{date.fromtimestamp(i.timestamp)}]{i.source}: {i.text}\n"""
-            return (dictionary_prompt + conversation_prompt).strip()
+            return (dictionary_prompt +"<|im_start|>system\n"+ conversation_prompt+"<|im_end|>").strip()
     return
                 
 def make_decision(options):
     global working_memory
-    global current_conversation
+    global current_conversation_prompt
     global notes
     predicted_results = []
     for i in options:
-        option_result = think.predict_option_result(current_conversation=current_conversation,
+        option_result = think.predict_option_result(current_conversation=current_conversation_prompt,
                                                           WM=working_memory,
                                                           notes=notes,
                                                           option_candidate=i)
         predicted_results.append({'option':i,'prediction':option_result})
     final_option_llm_response = think.decide_final_option(predicted_results)
-    final_option = classification.zeroshot_classification(sentence = final_option_llm_response,labels=options)
+    print(final_option_llm_response)
+    final_option = classification.zeroshot_classification(sentence = final_option_llm_response,labels=options)['labels'][0]
     return final_option
         
         
@@ -166,6 +167,8 @@ mailbox = []
 state = ''
 working_memory = []
 current_conversation = []
+current_conversation_prompt = ''
+current_conversation_chatml = ''
 current_sentence_plan = ''
 notes = ''
 options = ['talk', 'stay silent'] # will appear as "Lucid decided to {option}."
@@ -179,32 +182,37 @@ while running:
         # process all types of mail
             
         mailbox = []
+       
     if len(new_messages) != 0:
         state = 'generating_response'
         for msg in new_messages:
             current_conversation.append(msg)
             #action_results = random_action()
             #working_memory.append(action_results['content'])
-        new_messages = []
-        notes = ''
-        notes = think.take_notes(current_conversation=current_conversation_style_convertor(current_conversation, 'chatml'), WM=working_memory, notes=notes)
+        if len(current_conversation) != 0:
+            current_conversation_prompt=current_conversation_style_convertor(current_conversation, 'prompt')
+            current_conversation_chatml=current_conversation_style_convertor(current_conversation, 'chatml')
+            new_messages = []
+            notes = ''
+            notes = think.take_notes(current_conversation=current_conversation_prompt, WM=working_memory, notes=notes)
 
         # Make decision from options
         chosen_option = make_decision(options=options)
+        print(f"Lucid chose to \"{chosen_option}\".")
         match chosen_option:
             case 'talk':
-                think.plan_sentence(current_conversation=current_conversation)
-                current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=current_conversation_style_convertor(current_conversation, 'chatml'))
+                think.plan_sentence(current_conversation=current_conversation_prompt, WM=working_memory)
+                current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=current_conversation_prompt)
                 working_memory.append(current_sentence_plan)
-                temp = current_conversation_style_convertor(current_conversation, 'chatml')
-                temp = think.converse(temp, working_memory)
+                temp = think.converse(current_conversation_chatml, working_memory)
                 state = 'stating_response'
                 say_out(temp)
+                current_conversation.append(conversation_message(text=temp, source='Lucid', type='message'))
             case 'stay silent':
                 pass
 
         working_memory = []
-        current_conversation.append(conversation_message(text=temp, source='Lucid', type='message'))
+
         while len(current_conversation) > 4:
             current_conversation.pop(0)
             
