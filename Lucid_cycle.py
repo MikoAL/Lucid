@@ -130,6 +130,25 @@ def current_conversation_style_convertor(conversation_message_list, style):
             return (dictionary_prompt + conversation_prompt).strip()
     return
                 
+def make_decision(options):
+    global working_memory
+    global current_conversation
+    global notes
+    predicted_results = []
+    for i in options:
+        option_result = think.predict_option_result(current_conversation=current_conversation,
+                                                          WM=working_memory,
+                                                          notes=notes,
+                                                          option_candidate=i)
+        predicted_results.append({'option':i,'prediction':option_result})
+    final_option_llm_response = think.decide_final_option(predicted_results)
+    final_option = classification.zeroshot_classification(sentence = final_option_llm_response,labels=options)
+    return final_option
+        
+        
+        
+        
+
 def say_out(text):
     print(f"Lucid: {text}")
                 
@@ -149,7 +168,7 @@ working_memory = []
 current_conversation = []
 current_sentence_plan = ''
 notes = ''
-
+options = ['talk', 'stay silent'] # will appear as "Lucid decided to {option}."
 while running:
     input_from_miko()
     if len(mailbox) != 0:
@@ -170,15 +189,20 @@ while running:
         notes = ''
         notes = think.take_notes(current_conversation=current_conversation_style_convertor(current_conversation, 'chatml'), WM=working_memory, notes=notes)
 
-        current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=current_conversation_style_convertor(current_conversation, 'chatml'))
-        if classification.stay_silent(current_sentence_plan) != True:
-            working_memory.append(current_sentence_plan)
-            temp = current_conversation_style_convertor(current_conversation, 'chatml')
-            temp = think.converse(temp, working_memory)
-            state = 'stating_response'
-            say_out(temp)
-        else:
-            temp = ''
+        # Make decision from options
+        chosen_option = make_decision(options=options)
+        match chosen_option:
+            case 'talk':
+                think.plan_sentence(current_conversation=current_conversation)
+                current_sentence_plan = think.plan_sentence(WM=working_memory, current_conversation=current_conversation_style_convertor(current_conversation, 'chatml'))
+                working_memory.append(current_sentence_plan)
+                temp = current_conversation_style_convertor(current_conversation, 'chatml')
+                temp = think.converse(temp, working_memory)
+                state = 'stating_response'
+                say_out(temp)
+            case 'stay silent':
+                pass
+
         working_memory = []
         current_conversation.append(conversation_message(text=temp, source='Lucid', type='message'))
         while len(current_conversation) > 4:

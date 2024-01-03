@@ -75,6 +75,15 @@ assistant:
     description = response.strip()
     
     return description
+def decide_action(current_conversation, working_memory, notes, options: list):
+    options_md = 'Options:'
+    for i in options:
+        options_md += f'\n- {i}'
+    
+    request = f"""{current_conversation}\n{notes}\nBased on all the info available to you, please choose an action that Lucid would realistically choose.\nUse the sentence structure \"Because.., so I choose the option...\"\n{options_md}"""
+    prompt = build_prompt(working_memory,request)
+    response = generation.llm(prompt)
+    return response.strip()
 
 def compare_info(info1, info2):
 
@@ -152,6 +161,21 @@ This is Lucid's current working memory, it includes her observations and thought
 
     response = generation.llm(prompt)
     
+    return response.strip()
+
+def decide_final_option(options_and_results: list):
+    options_and_results_str = ''
+    for pair in options_and_results:
+        options_and_results_str += f"\nPossible Action: {pair['option']}\nPredicted Result: {pair['prediction']}\n"
+    request = f"{options_and_results_str.strip()}\nBased on the \"Predicted Results\", choose a desirable \"Possible Action\".\nAnswer with the sentence format \"Because..., I chose...\""
+    prompt = build_prompt(working_memory='',request=request)
+    response = generation.llm(prompt)
+    return response.strip()
+
+def predict_option_result(current_conversation, WM, notes, option_candidate:str):
+    request =f"""{current_conversation}\n{notes}\nBased on all the info available to you, please realistically predict what will happen if Lucid decided to \"{option_candidate}\".\nUse the sentence format \"Prediction: If Lucid decided to \"{option_candidate}\"... will happen.\""""
+    prompt = build_prompt(WM, request)
+    response = generation.llm(prompt)
     return response.strip()
 
 def predict(current_conversation, WM):
