@@ -9,6 +9,6 @@ Make an AI Vtuber that can pass as human even after long periods of interactions
 - Memory [HARD]
 - Voice Output [MEDIUM]
 
-# Top Priorities
+# Top Extra Priorities
 - Real Time Chat
   - Voice Input [MEDIUM]
