@@ -13,3 +13,12 @@ Make an AI Vtuber that can pass as human even after long periods of interactions
 - Real Time Chat
   - Voice Input [MEDIUM]
 
+# Notes
+> Thought Process
+>> Use COT (Further Planning is Required)
+
+> UI
+>> By UI, I mean the streaming assets.
+>> Purchasing or finding free material is adviced.
+
+> OBS Integration 
