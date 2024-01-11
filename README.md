@@ -1,7 +1,7 @@
 # Project Goal
 Make an AI Vtuber that can pass as human even after long periods of interactions.
 
-## Essential Systems
+### Essential Systems
 - Thought Process [HARD]
 - UI [HARD]
 - OBS intergration [MEDIUM]
@@ -9,7 +9,7 @@ Make an AI Vtuber that can pass as human even after long periods of interactions
 - Memory [HARD]
 - Voice Output [MEDIUM]
 
-## Top Extra Priorities
+### Top Extra Priorities
 - Real Time Chat
   - Voice Input [MEDIUM]
 
