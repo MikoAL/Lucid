@@ -18,16 +18,14 @@ To make a decision you need to:
 
 # Learning
 
-
+ To make sure the system improves, we will use a small llm model (phi-2) for easy and cheap (relatively) RLHF.
+ The part of the evaluation that will be changed, is the prediction part, hopefully, with training, it can provide more accurate predictions.
+ 
+ 1. Everytime we need to make a decision, we save the state given to the llm.
+ 2. When the result comes in, fine tune the model with its old saved state and the correct result.
 
 # COC Template
 
-> To make sure the system improves, we will use a small llm model (phi-2) for easy and cheap (relatively) RLHF.
-> The part of the evaluation that will be changed, is the prediction part, hopefully, with training, it can provide more accurate predictions.
-> 
-> 1. Everytime we need to make a decision, we save the state given to the llm.
-> 2. When the result comes in, fine tune the model with its old saved state and the correct result.
-> 
 > I am {{char}}
 > I am {{char}}, I also play and talk as all NPCs except {{user}}
 > I control all characters except {{user}} - X Y Z
