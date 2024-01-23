@@ -4,6 +4,8 @@ import os
 import logging
 import time
 import json
+from threading import Thread
+
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Get the absolute path of the script's directory
@@ -31,11 +33,27 @@ except requests.exceptions.RequestException as e:
 headers = {'Content-Type': 'application/json'}
 
 def send_message(message, user_name=user_name, server=server):
-    requests.post(url=f'{server}/postbox', json=({'content':message,'source':user_name,'timestamp':time.time()}))
+    requests.post(url=f'{server}/postbox', json=({'content':message,'source':user_name,'timestamp':time.time(), 'type':'conversation'}))
     return
 
-send_message('Testtttt')
-new_mail = (requests.get(url = f"{server}/mailbox")).json()
-print(new_mail)
-new_mail = (requests.get(url = f"{server}/mailbox")).json()
-print(new_mail)
+def get_display(server=server):
+    return ((requests.get(url=f'{server}/display')).json())['content']
+
+def input_thread():
+    while True:
+        user_input = input(f'{user_name}: ')
+        send_message(user_input)
+        
+def display_thread():
+    while True:
+        new_output = get_display()
+        if new_output != '':
+            print(f"Lucid: {new_output}")
+        else:
+            time.wait(0.05)
+if __name__ == '__main__':
+    t1 = Thread(target=input_thread)
+    t2 = Thread(target=display_thread)
+
+    t1.start()
+    t2.start()

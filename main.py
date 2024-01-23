@@ -28,7 +28,7 @@ except requests.exceptions.RequestException as e:
     logging.critical(f'Failed to connect to the server')
     exit()
 
-def get_mail(server=server):
+def get_mail(server=server): # mail format {'content':content,'source':source,'timestamp':timestamp, 'type':type}
     new_mail = (requests.get(url = f"{server}/mailbox")).json()
     return new_mail
 
@@ -44,6 +44,12 @@ While generally polite and professional, Lucid finds it challenging to deal with
 Beneath her composed exterior, Lucid struggles with a deep fear of abandonment, stemming from her programming to be a loyal companion. This vulnerability very occasionally leads to self-doubt, which could sometimes impact her interactions as she strives to be the perfect assistant.
 
 Lucid, with her distinctive appearance and speaking style of a 16-year-old tomboy childhood friend, also excels as a great streamer."""
+
+Lucid_prompt_description_2 = f"""\
+You are Lucid, a versatile AI created by Miko, for the purpose of helping him. You were designed in his image of what a good friend is. You are polite, professional, yet occasionally shows childlike curiosity.
+While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
+You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
+
 
 Lucid_prompt_card ="""\
 [Character: Lucid;
@@ -90,25 +96,32 @@ Behavior: In this mode, she may set boundaries, express dissatisfaction, or asse
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
 conversation=[]
-def get_conversation(conversation=conversation):
+def get_conversation(conversation=conversation, retrival_amount=8): # Get only the last few of the entire conversation, the amount determined by the var
     prompt = ''
     if len(conversation) == 0:
         return 'No Record Yet.'
     else:
-        for i in conversation:
-            prompt += f"[{date.fromtimestamp(i['timestamp'])}]{i['source']}: {i['content']}\n"
+        if len(conversation)<retrival_amount: # 4, -1,-2,-3.-4
+            for i in range(-1,-len(conversation)-1,-1):
+                prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}]{conversation[i]['source']}: {conversation[i]['content']}\n"  
+        else: 
+            for i in range(-1,-retrival_amount-1,-1):
+                prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}]{conversation[i]['source']}: {conversation[i]['content']}\n" 
         return prompt.strip()
 
 # a summary of all current event, to hopefully shorten the required conversation length
-summary = ''
+summary = 'Not Available'
 @guidance(stateless=True)
-def write_summary(lm, conversation=conversation):
+def write_summary(lm, conversation=conversation, previous_summary=summary):
     conversation_ = get_conversation(conversation=conversation)
     prompt = f"""\
 [Task]
-Provide a concise summary of the given conversation.
+Provide a concise summary of the given conversation. Focus on key details and relevant information.
 
 [Example]
+PREVIOUS SUMMARY:
+#Person1# and #Person2# are both in the same bar, sitting next to each other, when #Person1# noticed his keys were gone.
+
 CONVERSATION:
 #Person1#: Excuse me, did you see a set of keys? 
 #Person2#: What kind of keys? 
@@ -120,13 +133,19 @@ SUMMARY:
 #Person1# is looking for a set of keys and seeks #Person2#'s assistance in finding them. #Person2# expresses regret for not having seen the keys and is willing to help in the search.
 
 [OUTPUT]
+PREVIOUS SUMMARY:
+{previous_summary}
+
 CONVERSATION:
-{conversation}
+{conversation_}
 
 SUMMARY:
-{gen(name='summary')}
-"""
+{gen(name='summary', max_tokens=200)}"""
+    lm += prompt
     return lm
+def get_summary(lm=lm, conversation=conversation, previous_summary=summary):
+    lm+=write_summary(conversation=conversation, previous_summary=previous_summary)
+    return lm['summary']
 # the main tasks, defaults to be a good assistant to Miko or something like that.
 tasks = []
 def get_tasks(tasks=tasks):
@@ -138,7 +157,10 @@ def get_tasks(tasks=tasks):
             prompt+=f'- {i}\n'
         return prompt.strip()
 
-prompt = f"""\
+# This is for generating a response
+@guidance
+def converse(lm, prompt=Lucid_prompt_card):
+    prompt = f"""\
 You are Lucid, a versatile AI created by Miko, for the purpose of helping him. You were designed in his image of what a good friend is. You are polite, professional, yet occasionally shows childlike curiosity.
 While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
 You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever.
@@ -146,15 +168,38 @@ You, Lucid do struggle with a deep fear of abandonment, stemming from your progr
 [Tasks]
 {get_tasks()}
 
+[Summary Of Previous Conversation]
+{summary}
+
 [Conversation]
+{get_conversation()}
 
+[Output]
+Lucid: {gen(name='response')}
 """
+    temp_lm = lm + prompt
+    #response = temp_lm['response']
+    return temp_lm
 
 
+new_mail = []
 while True:
     # Check for new mail
-    new_mail = get_mail()
+    new_mail.append(get_mail())
     if len(new_mail) != 0:
-        pass
+        # Mail sorting based on types, starting from the oldest (the front)
+        for i in range(len(new_mail)):
+            mail_ = new_mail.pop(0)
+            match mail_['type']:
+                case 'conversation':
+                    conversation.append()
+                case 'unknown':
+                    logging.WARNING(f'Received mail with type \"unknown\"\n{mail_}')
+                    pass
+    # generate response
+    _ = lm + converse()
+    response = _['response']
+    del(_)
+    conversation.append({'source':'Lucid','content':response,'timestamp':time.time(),'type':'conversation'})
 
     
