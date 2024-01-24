@@ -7,7 +7,7 @@ import json
 from threading import Thread
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
+logging.disable()
 # Get the absolute path of the script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the working directory to the script's directory
@@ -50,7 +50,7 @@ def display_thread():
         if new_output != '':
             print(f"Lucid: {new_output}")
         else:
-            time.wait(0.05)
+            time.sleep(0.5)
 if __name__ == '__main__':
     t1 = Thread(target=input_thread)
     t2 = Thread(target=display_thread)

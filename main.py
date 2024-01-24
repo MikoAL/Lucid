@@ -6,7 +6,7 @@ import os
 import logging
 from datetime import date
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
+#logging.disable()
 # Get the absolute path of the script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the working directory to the script's directory
@@ -32,9 +32,12 @@ def get_mail(server=server): # mail format {'content':content,'source':source,'t
     new_mail = (requests.get(url = f"{server}/mailbox")).json()
     return new_mail
 
+def send_output(output, server=server):
+    requests.post(url=f"{server}/output",json=output)    
+
 from guidance import models, gen, select
 import guidance
-lm = models.Transformers('TheBloke/Garrulus-GPTQ', device_map="cuda")
+lm = models.Transformers('TheBloke/Garrulus-GPTQ', device_map="cuda", echo=False)
 
 Lucid_prompt_description = """\
 Lucid, created by Miko, is a versatile AI with the appearance of a 16 year old girl. Despite her professional demeanor, she occasionally reveals a childlike curiosity and playfulness, adding an endearing but unpredictable touch to her character.
@@ -96,16 +99,16 @@ Behavior: In this mode, she may set boundaries, express dissatisfaction, or asse
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
 conversation=[]
-def get_conversation(conversation=conversation, retrival_amount=8): # Get only the last few of the entire conversation, the amount determined by the var
+def get_conversation(conversation=conversation, retrieval_amount=8): # Get only the last few of the entire conversation, the amount determined by the var
     prompt = ''
     if len(conversation) == 0:
         return 'No Record Yet.'
     else:
-        if len(conversation)<retrival_amount: # 4, -1,-2,-3.-4
+        if len(conversation)<retrieval_amount: # 4, -1,-2,-3.-4
             for i in range(-1,-len(conversation)-1,-1):
                 prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}]{conversation[i]['source']}: {conversation[i]['content']}\n"  
         else: 
-            for i in range(-1,-retrival_amount-1,-1):
+            for i in range(-1,-retrieval_amount-1,-1):
                 prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}]{conversation[i]['source']}: {conversation[i]['content']}\n" 
         return prompt.strip()
 
@@ -185,21 +188,26 @@ Lucid: {gen(name='response')}
 new_mail = []
 while True:
     # Check for new mail
-    new_mail.append(get_mail())
+    new_mail.extend(get_mail())
     if len(new_mail) != 0:
         # Mail sorting based on types, starting from the oldest (the front)
         for i in range(len(new_mail)):
             mail_ = new_mail.pop(0)
+            #print(mail_)
             match mail_['type']:
                 case 'conversation':
-                    conversation.append()
+                    conversation.append(mail_)
+                    logging.debug(f'Got mail: {mail_}')
                 case 'unknown':
                     logging.WARNING(f'Received mail with type \"unknown\"\n{mail_}')
                     pass
-    # generate response
-    _ = lm + converse()
-    response = _['response']
-    del(_)
-    conversation.append({'source':'Lucid','content':response,'timestamp':time.time(),'type':'conversation'})
+        # generate response
+        logging.debug('generating response')
+        _ = lm + converse()
+        response = {'source':'Lucid','content':_['response'],'timestamp':time.time(),'type':'conversation'}
+        logging.debug(f"generated response:\n{_['response']}")
+        del(_)
+        conversation.append(response)
+        send_output(output=response)
 
     

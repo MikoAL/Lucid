@@ -27,7 +27,7 @@ mailbox = []
 # source
 # timestamp
 # 
-
+new_message = Output(content='')
 @app.get("/")
 async def root():
     return {'message':'Hello Mom!'}
@@ -45,6 +45,7 @@ async def retrive_mail():
     _ = mailbox.copy()
     mailbox.clear()
     return _
+
 
 @app.post("/test")
 async def test(test):
