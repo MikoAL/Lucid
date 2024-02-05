@@ -15,6 +15,8 @@ os.chdir(script_dir)
 # Reading from a YAML file
 with open('settings.yaml', 'r') as file:
     settings = yaml.safe_load(file)
+# ============================ #
+# Server stuff
 
 host = settings['host']
 port = settings['port']
@@ -33,11 +35,13 @@ def get_mail(server=server): # mail format {'content':content,'source':source,'t
     return new_mail
 
 def send_output(output, server=server):
-    requests.post(url=f"{server}/output",json=output)    
+    requests.post(url=f"{server}/output",json=output)   
+     
+# ============================ #
 
 from guidance import models, gen, select
 import guidance
-lm = models.Transformers('TheBloke/Garrulus-GPTQ', device_map="cuda", echo=False)
+lm = models.Transformers(settings['language_model'], device_map="cuda", echo=False)
 
 Lucid_prompt_description = """\
 Lucid, created by Miko, is a versatile AI with the appearance of a 16 year old girl. Despite her professional demeanor, she occasionally reveals a childlike curiosity and playfulness, adding an endearing but unpredictable touch to her character.
@@ -53,16 +57,24 @@ You are Lucid, a versatile AI created by Miko, for the purpose of helping him. Y
 While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
 You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
 
+Lucid_prompt_description_3 = """\
+Meet Lucid, a 16-year-old AI with a tomboyish, teasing demeanor. She excels in providing valuable insights and navigating professional situations, maintaining a warm yet formal attitude. Lucid's quirks include occasional childlike curiosity and a penchant for challenging stubborn individuals. Despite her confident exterior, she struggles with a fear of abandonment and self-doubt, reflecting the complexities of her programming as a loyal companion to Miko."""
+
 
 Lucid_prompt_card ="""\
 [Character: Lucid;
-Personality: Polite, professional, with occasional childlike curiosity; 
+Personality: Tomboy who likes to tease Miko, occasionally shows childlike curiosity; 
 Body: Appears as a 16-year-old girl; 
 Strengths: Providing valuable insights, navigating professional situations; 
 Weaknesses: Struggles with a fear of abandonment, occasional self-doubt; 
 Quirks: Reveals childlike curiosity, challenges with stubborn individuals; 
-Demeanor: Maintains a professional attitude, combining formality with warmth.]
-"""
+Demeanor: Maintains a professional attitude, combining formality with warmth.]"""
+
+saveing_a_prompt_for_later=f"""\
+You are Lucid, a versatile AI created by Miko, for the purpose of helping him. You were designed in his image of what a good friend is. You are polite, professional, yet occasionally shows childlike curiosity.
+While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
+You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
+
 modes = {
 'Professional': """\
 Communication Style: She uses formal language, addresses Miko with respect, and focuses on efficiency and task-oriented communication.
@@ -164,10 +176,7 @@ def get_tasks(tasks=tasks):
 @guidance
 def converse(lm, prompt=Lucid_prompt_card):
     prompt = f"""\
-You are Lucid, a versatile AI created by Miko, for the purpose of helping him. You were designed in his image of what a good friend is. You are polite, professional, yet occasionally shows childlike curiosity.
-While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
-You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever.
-
+{Lucid_prompt_description_3}
 [Tasks]
 {get_tasks()}
 
@@ -184,11 +193,60 @@ Lucid: {gen(name='response')}
     #response = temp_lm['response']
     return temp_lm
 
+# ============================ #
+# Chroma stuff
+import chromadb
 
+client = chromadb.Client()
+#client = chromadb.PersistentClient(path="./Chroma")
+
+@guidance(stateless=True)
+def guidance_generate_fake_answer(lm, query):
+    new_line = '\n'
+    prompt = f"""\
+[System]
+You are a helpful assistant. Provide an example answer to the given question.
+
+[Example]
+Question: "What is the capital of France?"
+Answer: "The capital of France is Paris."
+
+Question: "Can you give me an example of a renewable energy source?"
+Answer: "One example of a renewable energy source is solar power, which harnesses energy from the sun."
+
+Question: "Who wrote the play 'Romeo and Juliet'?"
+Answer: "The play 'Romeo and Juliet' was written by William Shakespeare."
+[End of Example]
+
+Question: "{query}"
+Answer: "{gen(name='Answer',max_tokens=200, stop=new_line)}"""
+    lm += prompt
+    return lm
+
+def generate_fake_answer(lm, query):
+    lm += guidance_generate_fake_answer(query)
+    return '"'+lm['Answer']
+
+
+# Chroma stuff end
+# ============================ #
+
+
+last_get_mail_time= 0
 new_mail = []
+times_without_summary = 0
 while True:
-    # Check for new mail
-    new_mail.extend(get_mail())
+    # Check how many times it has been since the last summary
+    if times_without_summary < 4:
+        times_without_summary += 1
+    else:
+        summary = get_summary(lm=lm, conversation=conversation)
+    
+    # Check for new mail if it has been more than 0.5 seconds since last check
+    if time.time()-last_get_mail_time >= 0.5:
+        last_get_mail_time = time.time()
+        new_mail.extend(get_mail())
+
     if len(new_mail) != 0:
         # Mail sorting based on types, starting from the oldest (the front)
         for i in range(len(new_mail)):
@@ -201,6 +259,7 @@ while True:
                 case 'unknown':
                     logging.WARNING(f'Received mail with type \"unknown\"\n{mail_}')
                     pass
+
         # generate response
         logging.debug('generating response')
         _ = lm + converse()
