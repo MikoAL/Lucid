@@ -18,6 +18,10 @@ Make an AI Vtuber that can pass as human even after long periods of interactions
 # Notes
 # Project Plan
 
+
+
+
+
 ## 1. Thought Process
 
 ### Overview
@@ -40,6 +44,10 @@ The Thought Process module is crucial for creating a believable AI Vtuber. The C
    - Create a decision-making system that allows the AI to dynamically choose responses based on the context of the conversation.
    - Implement mechanisms to handle ambiguous or open-ended questions.
 
+
+
+
+
 ## 2. UI (Streaming Assets)
 
 ### Overview
@@ -53,6 +61,10 @@ The UI is a critical component for the visual representation of the AI Vtuber du
 2. **UI Customization:**
    - Integrate the acquired assets into the streaming software (OBS) to create a visually appealing and cohesive UI.
    - Customize overlays for different scenarios, such as gaming, chatting, or special events.
+
+
+
+
 
 ## 3. OBS Integration
 
@@ -72,6 +84,10 @@ OBS integration is essential for broadcasting the AI Vtuber's stream to the audi
    - Set up audio sources for the AI Vtuber's voice output and any background music.
    - Test and optimize audio levels for clear and balanced sound.
 
+
+
+
+
 ## 4. Live2D
 
 ### Overview
@@ -86,6 +102,10 @@ Live2D is responsible for animating the 2D model of the AI Vtuber. Commissioning
    - Collaborate with the artist during the rigging process to ensure the Live2D model can express a wide range of emotions and movements.
    - Test and iterate on the rigging to achieve fluid animations.
 
+
+
+
+
 ## 5. Memory
 
 ### Overview
@@ -99,6 +119,12 @@ Implementing memory systems is crucial for the AI Vtuber to remember past intera
 2. **Long-Term Memory:**
    - Implement a long-term memory system to store important user preferences, recurring topics, and overall user history.
    - Ensure the system respects user privacy and data protection regulations.
+### Notes
+Directed acyclic graph may be a solution, treat people and events as objects.
+
+
+
+
 
 ## 6. Voice Output
 
@@ -113,6 +139,10 @@ Selecting a high-quality voice model is essential for creating a natural and eng
 2. **Integration with Thought Process:**
    - Integrate the selected voice model with the Thought Process module to synchronize speech with the AI's generated responses.
    - Fine-tune parameters for a more natural and human-like voice.
+
+
+
+
 
 ## Top Extra Priorities
 
