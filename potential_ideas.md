@@ -32,6 +32,19 @@ This is a vector database where we cache all the info blocks that the working me
 Before a freshly generated info block is placed inside the working memory, it will be evaluated for redundentcy, we will do this by comparing all the new cross-encoder
 
 ### Long-term Memory
+> How long term memory works is not finalized.
+### First possible solution
+Object Oriented Memory
+
+Object types include:
+People
+Event
+
+People Object:
+Each person will have a separate vector database, all vectors will be info blocks about the person.
+
+Event Object:
+
 
 ### Conversation Mode
 During Conversation Mode, the AI can retrive info from long-term memory to working memory. 
