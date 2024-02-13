@@ -17,39 +17,32 @@ Objects:
 Events are made out of 
 people and smaller events
 
-### Info Blocks
-Info Blocks refers to any info picked up and generated into working memory.
-Contains the "content", "timestep" and "vector" attributes.
+Certainly, here's a refined version for your documentation:
 
-### Working Memory
-Working memory is a list containing the most recent Info Blocks, the list will have a limit on how many items it can hold at once, if exceeded, the oldest item will be deleted, but the same info block will still be avaliable in the short-term memory.
-The list will always be avaliable for the llm as context.
+---
 
-### Short-term Memory
-This is a vector database where we cache all the info blocks that the working memory couldn't store (also includes the ones still inside the working memory for conveience sake), all info blocks regardless of types, will be stored inside.
+## Information Blocks
+Information Blocks refer to any data picked up and processed into working memory. They consist of attributes such as "content" "timestamp" and "vector".
 
-#### Note
-Before a freshly generated info block is placed inside the working memory, it will be evaluated for redundentcy, we will do this by comparing all the new cross-encoder
+## Working Memory
+Working Memory is a repository containing the most recent Information Blocks. It has a capacity limit, and if exceeded, the oldest item is purged. However, the purged item remains accessible in Short-term Memory. This list of Information Blocks serves as contextual input for the language model.
 
-### Long-term Memory
-> How long term memory works is not finalized.
-### First possible solution
-Object Oriented Memory
+## Short-term Memory
+Short-term Memory acts as a cache for all Information Blocks that exceed the capacity of Working Memory. It stores all types of Information Blocks for future reference, including those currently in Working Memory.
 
-Object types include:
-People
-Event
+### Note:
+Before a newly generated Information Block enters Working Memory, it undergoes redundancy evaluation. This evaluation involves comparing it with existing Information Blocks using cross-encoders.
+New Info Block's vector will be used to query in the Short-term Memory vector database, use cross-encoder to check for similarity, if it's above a certain threshold, we will discard the new Info Block and retrive the similar Info Block and push it into Working Memory.
 
-People Object:
-Each person will have a separate vector database, all vectors will be info blocks about the person.
+## Long-term Memory
+The architecture for Long-term Memory is still a WIP. One proposed solution is an Object-Oriented Memory system, which includes People and Event Objects.
 
-Event Object:
-
+- **People Object:** Each individual is assigned a dedicated vector database containing all relevant Information Blocks.
+- **Event Object:** Events are composed of People Objects (if applicable), other Event Objects, and a descriptive string outlining the occurrence.
 
 ### Conversation Mode
-During Conversation Mode, the AI can retrive info from long-term memory to working memory. 
-No edits to the long-term memory will be allowed during Conversation Mode.
+In Conversation Mode, the AI can retrieve information from Long-term Memory to Working Memory. However, edits to Long-term Memory are prohibited during this mode.
 
 ### Sleep Mode: Vector Database Update and Similarity Check
-During the Sleep Mode, the AI undergoes a comprehensive review of the vector databases. This process involves comparing the newly added information committed from Short-term Memory, with existing data. The AI employs a cross-encoder on the initial query results to assess their similarity. If a substantial resemblance is detected, the language model (LLM) is invoked to merge the two pieces of information, treating the amalgamation as freshly added data. This iterative process continues until no results exhibit significant similarity, ensuring a refined and coherent database.
+During Sleep Mode, the AI conducts a thorough review of vector databases. This process involves comparing newly added data from Short-term Memory with existing records. Using cross-encoders, the AI evaluates the similarity of initial query results. If significant resemblance is found, the language model is employed to merge the information, treating it as new data. This iterative process continues until no substantial similarities remain, ensuring a streamlined and coherent database.
 

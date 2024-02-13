@@ -164,7 +164,7 @@ Lucid: {gen(name='response')}
 # Chroma stuff
 import chromadb
 
-client = chromadb.Client()
+short_term_memory = chromadb.Client()
 #client = chromadb.PersistentClient(path="./Chroma")
 
 @guidance(stateless=True)
@@ -192,7 +192,7 @@ Answer: "{gen(name='Answer',max_tokens=200, stop=new_line)}"""
 
 def generate_fake_answer(lm, query):
     lm += guidance_generate_fake_answer(query)
-    return '"'+lm['Answer']
+    return ('"'+lm['Answer']).strip('"')
 
 
 # Chroma stuff end
