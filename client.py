@@ -56,4 +56,4 @@ if __name__ == '__main__':
     t2 = Thread(target=display_thread)
 
     t1.start()
-    t2.start()
+    #t2.start()

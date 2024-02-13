@@ -197,8 +197,17 @@ def generate_fake_answer(lm, query):
 
 # Chroma stuff end
 # ============================ #
+# Temp TTS stuff
 
+from RealtimeTTS import TextToAudioStream, SystemEngine
 
+engine = SystemEngine() # replace with your TTS engine
+stream = TextToAudioStream(engine)
+#stream.feed("Hello world! How are you today?")
+#stream.play_async()
+
+# Temp TTS stuff end
+# ============================ #
 last_get_mail_time= 0
 new_mail = []
 times_without_summary = 0
@@ -235,6 +244,8 @@ while True:
         logging.debug(f"generated response:\n{tmp['response']}")
         del(tmp)
         conversation.append(response)
-        send_output(output=response)
+        stream.feed(response['content'])
+        stream.play_async()
+        #send_output(output=response)
 
     
