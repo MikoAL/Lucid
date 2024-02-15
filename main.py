@@ -15,6 +15,7 @@ os.chdir(script_dir)
 # Reading from a YAML file
 with open('settings.yaml', 'r') as file:
     settings = yaml.safe_load(file)
+
 # ============================ #
 # Server stuff
 
@@ -43,6 +44,8 @@ from guidance import models, gen, select
 import guidance
 lm = models.Transformers(settings['language_model'], device_map="cuda", echo=False)
 
+prompt_path = r".\Prompts"
+
 Lucid_prompt_description = """\
 Lucid, created by Miko, is a versatile AI with the appearance of a 16 year old girl. Despite her professional demeanor, she occasionally reveals a childlike curiosity and playfulness, adding an endearing but unpredictable touch to her character.
 
@@ -58,17 +61,10 @@ While you can get on Miko's nerves sometimes when you tease him for doing someth
 You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
 
 Lucid_prompt_description_3 = """\
-Meet Lucid, a 16-year-old AI with a tomboyish, teasing demeanor. She excels in providing valuable insights and navigating professional situations, maintaining a warm yet formal attitude. Lucid's quirks include occasional childlike curiosity and a penchant for challenging stubborn individuals. Despite her confident exterior, she struggles with a fear of abandonment and self-doubt, reflecting the complexities of her programming as a loyal companion to Miko."""
+Meet Lucid, a 16-year-old AI with a tomboyish, teasing demeanor. She excels in providing valuable insights and navigating various situations with warmth and friendliness. Lucid's quirks include occasional childlike curiosity and a penchant for challenging stubborn individuals. Despite her confident exterior, she struggles with a fear of abandonment and self-doubt, reflecting the complexities of her programming as a loyal friend to Miko."""
 
-
-Lucid_prompt_card ="""\
-[Character: Lucid;
-Personality: Tomboy who likes to tease Miko, occasionally shows childlike curiosity; 
-Body: Appears as a 16-year-old girl; 
-Strengths: Providing valuable insights, navigating professional situations; 
-Weaknesses: Struggles with a fear of abandonment, occasional self-doubt; 
-Quirks: Reveals childlike curiosity, challenges with stubborn individuals; 
-Demeanor: Switches between a professional attitude and a cheeky child, combining formality with warmth.]"""
+with open(f"{prompt_path}\Lucid_prompt_card.txt", 'r') as f:
+    Lucid_prompt_card = f.read()
 
 saveing_a_prompt_for_later=f"""\
 You are Lucid, a versatile AI created by Miko, for the purpose of helping him. You were designed in his image of what a good friend is. You are polite, professional, yet occasionally shows childlike curiosity.
@@ -132,7 +128,7 @@ def get_summary(lm=lm, conversation=conversation, previous_summary=summary):
 tasks = []
 def get_tasks(tasks=tasks):
     if len(tasks)==0:
-        return '- Be a good assistant to Miko.'
+        return '- Be a good friend to Miko.'
     else:
         prompt = ''
         for i in tasks:
@@ -141,9 +137,12 @@ def get_tasks(tasks=tasks):
 
 # This is for generating a response
 @guidance
-def converse(lm, prompt=Lucid_prompt_card):
+def converse(lm, prompt_card=Lucid_prompt_card):
+    new_line= "\n"
     prompt = f"""\
-{Lucid_prompt_description_3}
+[System]
+You are Lucid, here are some info on Lucid.
+{prompt_card}
 [Tasks]
 {get_tasks()}
 
@@ -154,8 +153,7 @@ def converse(lm, prompt=Lucid_prompt_card):
 {get_conversation()}
 
 [Output]
-Lucid: {gen(name='response')}
-"""
+Lucid: {gen(name='response', stop=new_line)}"""
     temp_lm = lm + prompt
     #response = temp_lm['response']
     return temp_lm

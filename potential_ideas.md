@@ -17,13 +17,21 @@ Objects:
 Events are made out of 
 people and smaller events
 
-Certainly, here's a refined version for your documentation:
+Events can have timelines?
 
 ---
 
 ## Information Blocks
-Information Blocks refer to any data picked up and processed into working memory. They consist of attributes such as "content" "timestamp" and "vector".
-
+Information Blocks refer to any data picked up and processed into working memory. They consist of attributes such as "content" "timestamp" and "vector"...
+```python
+{
+  'object_type':'people',
+  'object_name':'Miko',
+  'content':'Miko likes Nintendo games.',
+  'timestamp':,
+  'vector':,
+}
+```
 ## Working Memory
 Working Memory is a repository containing the most recent Information Blocks. It has a capacity limit, and if exceeded, the oldest item is purged. However, the purged item remains accessible in Short-term Memory. This list of Information Blocks serves as contextual input for the language model.
 
