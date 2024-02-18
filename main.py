@@ -5,7 +5,7 @@ import yaml
 import os
 import logging
 from datetime import date
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p')
 #logging.disable()
 # Get the absolute path of the script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -71,6 +71,7 @@ You are Lucid, a versatile AI created by Miko, for the purpose of helping him. Y
 While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
 You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
 
+Lucid_lm = lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
 conversation=[]
@@ -137,12 +138,9 @@ def get_tasks(tasks=tasks):
 
 # This is for generating a response
 @guidance
-def converse(lm, prompt_card=Lucid_prompt_card):
+def converse(lm):
     new_line= "\n"
     prompt = f"""\
-[System]
-You are Lucid, here are some info on Lucid.
-{prompt_card}
 [Tasks]
 {get_tasks()}
 
@@ -161,9 +159,70 @@ Lucid: {gen(name='response', stop=new_line)}"""
 # ============================ #
 # Chroma stuff
 import chromadb
+from sentence_transformers import SentenceTransformer
+#sentences = ["This is an example sentence", "Each sentence is converted"]
 
+sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+#embeddings = sentence_transformer.encode(sentences)#
 short_term_memory = chromadb.Client()
 #client = chromadb.PersistentClient(path="./Chroma")
+working_memory = []
+"""
+This is what a Info Block should look like
+{
+  'object_type' : 'people',
+  'object_name' : 'Miko',
+  'content' : 'Miko like Nintendo games.',
+  'timestamp' : '2021-10-15 17:37:00',
+  'vector' array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32): ,
+}    
+"""
+#def process_new_info_block(lm_text_result):
+
+@guidance(stateless=True)
+def guidance_make_new_info_block(lm, passage):
+    first_curly = "{"
+    second_curly = "}"
+    lm += """\
+This is what a Info Block should look like from an example:
+[Example]
+Lucid: What are you doing now? Stop ignoring me!
+Miko: I'm playing Nintendo games.
+Lucid: And that's a higher priority than me?
+Miko: ...
+Lucid: Your silence speaks volumes.
+
+```json
+{
+  "object_type" : 'people',
+  "object_name" : 'Miko',
+  "content" : 'Miko likes Nintendo games.',
+}
+```
+[End of Example]
+"""
+    lm += f"""\
+{passage}
+```json
+{first_curly}
+  "object_type" : '{select(['people','events'], name="object_type")},
+  "object_name" : "{gen(stop='"',name = "object_name")},
+  "content" : "{gen(stop='"',name="content")},"""  
+    return lm
+
+def make_new_info_block(lm, passage):
+  first_curly = "{"
+  second_curly = "}"
+  lm += guidance_make_new_info_block(passage)
+  timestamp = date.fromtimestamp(time.time())
+  json_file ={
+  "object_type" : lm['object_type'],
+  "object_name" : lm['object_name'],
+  "content" : lm['content'],
+  "timestamp" : timestamp,
+  "vector" : sentence_transformer.encode([lm['content']]),
+  }
+  return json_file
 
 @guidance(stateless=True)
 def guidance_generate_fake_answer(lm, query):
@@ -191,7 +250,7 @@ Answer: "{gen(name='Answer',max_tokens=200, stop=new_line)}"""
 def generate_fake_answer(lm, query):
     lm += guidance_generate_fake_answer(query)
     return ('"'+lm['Answer']).strip('"')
-
+ 
 
 # Chroma stuff end
 # ============================ #
@@ -237,7 +296,7 @@ while True:
 
         # generate response
         logging.debug('generating response')
-        tmp = lm + converse()
+        tmp = Lucid_lm + converse()
         response = {'source':'Lucid','content':tmp['response'],'timestamp':time.time(),'type':'conversation'}
         logging.debug(f"generated response:\n{tmp['response']}")
         del(tmp)

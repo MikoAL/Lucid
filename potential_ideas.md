@@ -23,13 +23,21 @@ Events can have timelines?
 
 ## Information Blocks
 Information Blocks refer to any data picked up and processed into working memory. They consist of attributes such as "content" "timestamp" and "vector"...
+```
+Lucid: What are you doing now? Stop ignoring me!
+Miko: I'm playing Nintendo games.
+Lucid: And that's a higher priority than me?
+Miko: ...
+Lucid: Your silence speaks volumes.
+```
+Result:
 ```python
 {
-  'object_type':'people',
-  'object_name':'Miko',
-  'content':'Miko likes Nintendo games.',
-  'timestamp':,
-  'vector':,
+  "object_type" : 'people',
+  "object_name" : 'Miko',
+  "content" : 'Miko likes Nintendo games.',
+  "timestamp" : '2021-10-15 17:37:00',
+  "vector" : array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,],[...]], dtype=float32),
 }
 ```
 ## Working Memory
