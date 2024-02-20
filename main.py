@@ -63,7 +63,7 @@ You, Lucid do struggle with a deep fear of abandonment, stemming from your progr
 Lucid_prompt_description_3 = """\
 Meet Lucid, a 16-year-old AI with a tomboyish, teasing demeanor. She excels in providing valuable insights and navigating various situations with warmth and friendliness. Lucid's quirks include occasional childlike curiosity and a penchant for challenging stubborn individuals. Despite her confident exterior, she struggles with a fear of abandonment and self-doubt, reflecting the complexities of her programming as a loyal friend to Miko."""
 
-with open(f"{prompt_path}\Lucid_prompt_card.txt", 'r') as f:
+with open(f"{prompt_path}\Lucid_prompt_card.txt", 'r', encoding='utf-8') as f:
 	Lucid_prompt_card = f.read()
 
 saveing_a_prompt_for_later=f"""\
@@ -137,7 +137,7 @@ def get_tasks(tasks=tasks):
 		return prompt.strip()
 
 # This is for generating a response
-@guidance
+@guidance(stateless=True)
 def converse(lm):
 	new_line= "\n"
 	prompt = f"""\
@@ -174,7 +174,7 @@ This is what a Info Block should look like
   'object_name' : 'Miko',
   'content' : 'Miko like Nintendo games.',
   'timestamp' : '2021-10-15 17:37:00',
-  'vector' array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32): ,
+  'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32) ,
 }    
 """
 #def process_new_info_block(lm_text_result):
@@ -260,18 +260,16 @@ engine = SystemEngine() # replace with your TTS engine
 stream = TextToAudioStream(engine)
 #stream.feed("Hello world! How are you today?")
 #stream.play_async()
-
+def play_audio(text):
+	stream.feed(text)
+	stream.play_async()
 # Temp TTS stuff end
 # ============================ #
 last_get_mail_time= 0
 new_mail = []
 times_without_summary = 0
 while True:
-	# Check how many times it has been since the last summary
-	if times_without_summary < 4:
-		times_without_summary += 1
-	else:
-		summary = get_summary(lm=lm, conversation=conversation)
+
 	
 	# Check for new mail if it has been more than 0.5 seconds since last check
 	if time.time()-last_get_mail_time >= 0.5:
@@ -299,8 +297,15 @@ while True:
 		logging.debug(f"generated response:\n{tmp['response']}")
 		del(tmp)
 		conversation.append(response)
-		stream.feed(response['content'])
-		stream.play_async()
+		play_audio(response['content'])
+  
+		# Check how many times it has been since the last summary
+		if times_without_summary < 4:
+			times_without_summary += 1
+		else:
+			summary = get_summary(lm=lm, conversation=conversation)
+			logging.debug(f"Generated summary:\n{summary}")
+			times_without_summary = 0
 		#send_output(output=response)
 
 	
