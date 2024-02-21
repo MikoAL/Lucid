@@ -160,11 +160,10 @@ Lucid: {gen(name='response', stop=new_line)}"""
 # Chroma stuff
 import chromadb
 from sentence_transformers import SentenceTransformer
-#sentences = ["This is an example sentence", "Each sentence is converted"]
 
 sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-#embeddings = sentence_transformer.encode(sentences)#
 short_term_memory = chromadb.Client()
+short_term_memory_uid = 1
 #client = chromadb.PersistentClient(path="./Chroma")
 working_memory = []
 """
@@ -177,7 +176,9 @@ This is what a Info Block should look like
   'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32) ,
 }    
 """
-#def process_new_info_block(lm_text_result):
+# load Long-term memory from file
+
+
 
 @guidance(stateless=True)
 def guidance_make_new_info_block(lm, passage):
@@ -248,8 +249,26 @@ Answer: "{gen(name='Answer',max_tokens=200, stop=new_line)}"""
 def generate_fake_answer(lm, query):
 	lm += guidance_generate_fake_answer(query)
 	return ('"'+lm['Answer']).strip('"')
- 
 
+def push_info_block_to_short_term_memory(info_block):
+	"""
+	Pushes an information block to the short-term memory.
+
+	Args:
+		info_block (dict): The information block to be added.
+
+	Returns:
+		None
+	"""
+	global short_term_memory
+	global short_term_memory_uid
+	short_term_memory.add(
+		ids=[short_term_memory_uid],
+		documents=[info_block],
+		embeddings=[info_block['vector']],
+		metadata=[info_block],
+	)
+	short_term_memory_uid += 1
 # Chroma stuff end
 # ============================ #
 # Temp TTS stuff
@@ -293,7 +312,12 @@ while True:
 		# generate response
 		logging.debug('generating response')
 		tmp = Lucid_lm + converse()
-		response = {'source':'Lucid','content':tmp['response'],'timestamp':time.time(),'type':'conversation'}
+		response = {
+      			'source' : 'Lucid',
+            	'content' : tmp['response'],
+            	'timestamp' : time.time(),
+            	'type' : 'conversation',
+            	}
 		logging.debug(f"generated response:\n{tmp['response']}")
 		del(tmp)
 		conversation.append(response)

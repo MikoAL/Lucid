@@ -56,9 +56,24 @@ The architecture for Long-term Memory is still a WIP. One proposed solution is a
 - **People Object:** Each individual is assigned a dedicated vector database containing all relevant Information Blocks.
 - **Event Object:** Events are composed of People Objects (if applicable), other Event Objects, and a descriptive string outlining the occurrence.
 
+### Diary System
+Entries are placed on a timeline, with Summaries as entries.
+- Memory
+  - Date
+    - Entry 1
+    - Entry 2
+    - Entry 3
+A seperate Vector database will be used for querying based on events.
+Each embedding will represent a single entry.
 ### Conversation Mode
-In Conversation Mode, the AI can retrieve information from Long-term Memory to Working Memory. However, edits to Long-term Memory are prohibited during this mode.
+In Conversation Mode, the AI can retrieve information from Long-term Memory to Working Memory and Short-term Memory.
 
 ### Sleep Mode: Vector Database Update and Similarity Check
 During Sleep Mode, the AI conducts a thorough review of vector databases. This process involves comparing newly added data from Short-term Memory with existing records. Using cross-encoders, the AI evaluates the similarity of initial query results. If significant resemblance is found, the language model is employed to merge the information, treating it as new data. This iterative process continues until no substantial similarities remain, ensuring a streamlined and coherent database.
 
+### Summary
+Summary acts as a way for the AI to remember the current conversation without the ENTIRE conversation being loaded, rather, use a combination of both the summary and the most recent dialog.
+
+The second function of having summaries is to act as the building blocks for Timelines, a continuous collection of what is happening within a time window.
+
+Can also acts as a diary of sorts to be stored into Long-Term memory.
