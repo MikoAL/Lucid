@@ -12,16 +12,34 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the working directory to the script's directory
 os.chdir(script_dir)
 
+
+# ============================ #
+# Settings
+
 # Reading from a YAML file
 with open('settings.yaml', 'r') as file:
 	settings = yaml.safe_load(file)
 
-# ============================ #
-# Server stuff
-
 host = settings['host']
 port = settings['port']
 server = f'http://{host}:{port}'
+language_model = settings['llm_settings']['language_model']
+temperature = settings['llm_settings']['temperature']
+top_k = settings['llm_settings']['top_k']
+top_p = settings['llm_settings']['top_p']
+
+logging.info('\n'.join([f"\nHost: {host}",
+              f"Port: {port}",
+              f"Server: {server}",
+              f"Language Model: {language_model}",
+              f"Temperature: {temperature}",
+              f"Top K: {top_k}",
+              f"Top P: {top_p}",
+              ]))
+
+# ============================ #
+# Server stuff
+
 
 try:
 	response = requests.get(server)
@@ -42,7 +60,7 @@ def send_output(output, server=server):
 
 from guidance import models, gen, select
 import guidance
-lm = models.Transformers(settings['language_model'], device_map="cuda", echo=False)
+lm = models.Transformers(language_model, device_map="cuda", echo=False)
 
 prompt_path = r".\Prompts"
 
@@ -119,7 +137,7 @@ CONVERSATION:
 {conversation_}
 
 SUMMARY:
-{gen(name='summary', max_tokens=200)}"""
+{gen(name='summary', max_tokens=200, temperature=temperature, top_k=top_k, top_p=top_p)}"""
 	lm += prompt
 	return lm
 def get_summary(lm=lm, conversation=conversation, previous_summary=summary):
@@ -151,7 +169,7 @@ def converse(lm):
 {get_conversation()}
 
 [Output]
-Lucid: {gen(name='response', stop=new_line)}"""
+Lucid: {gen(name='response', stop=new_line, temperature=temperature, top_k=top_k, top_p=top_p)}"""
 	temp_lm = lm + prompt
 	#response = temp_lm['response']
 	return temp_lm
@@ -207,8 +225,8 @@ Lucid: Your silence speaks volumes.
 ```json
 {first_curly}
   "object_type" : '{select(['people','events'], name="object_type")},
-  "object_name" : "{gen(stop='"',name = "object_name")},
-  "content" : "{gen(stop='"',name="content")},"""  
+  "object_name" : "{gen(stop='"',name = "object_name", temperature=temperature, top_k=top_k, top_p=top_p)},
+  "content" : "{gen(stop='"',name="content", temperature=temperature, top_k=top_k, top_p=top_p)},"""  
 	return lm
 
 def make_new_info_block(lm, passage):
@@ -242,7 +260,7 @@ Answer: "The play 'Romeo and Juliet' was written by William Shakespeare."
 [End of Example]
 
 Question: "{query}"
-Answer: "{gen(name='Answer',max_tokens=200, stop=new_line)}"""
+Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=temperature, top_k=top_k, top_p=top_p)}"""
 	lm += prompt
 	return lm
 
@@ -251,15 +269,6 @@ def generate_fake_answer(lm, query):
 	return ('"'+lm['Answer']).strip('"')
 
 def push_info_block_to_short_term_memory(info_block):
-	"""
-	Pushes an information block to the short-term memory.
-
-	Args:
-		info_block (dict): The information block to be added.
-
-	Returns:
-		None
-	"""
 	global short_term_memory
 	global short_term_memory_uid
 	short_term_memory.add(
