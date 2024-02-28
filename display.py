@@ -45,17 +45,6 @@ def make_layout() -> Layout:
 
 text = Text('')
 
-def get_ch(input_text):
-	while True:
-		ch:str = getchlib.getkey(False, echo=False)
-		if ch.isprintable():
-			return input_text + ch
-		elif ch == '\x7f':
-			# If backspace, crop last ch
-			input_text = input_text[:-1]
-		elif ch == '\n':
-			# Do nothing right now
-			pass
 
 
 class Header:
@@ -77,6 +66,7 @@ layout["box1"].update(Panel("This is the first box", title="Box 1"))
 layout['footer'].update(Panel(Align.left(text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
 with Live(layout, refresh_per_second=10 ,screen=True) as live:
 	while True:
-		input_text = get_ch(input_text)
+		input_text = get_input()
 		layout['footer'].update(Panel(Align.left(input_text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
 	 
+
