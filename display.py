@@ -32,16 +32,21 @@ def make_layout() -> Layout:
 	layout = Layout(name="root")
 
 	layout.split(
-		Layout(name="header", size=3),
-		Layout(name="main", ratio=1),
-		Layout(name="footer", size=7),
+		#Layout(name="header", size=3),
+		Layout(name="main", ratio=2),
+		Layout(name="footer", ratio=1),
 	)
 	layout["main"].split_row(
-		Layout(name="side"),
-		Layout(name="body", ratio=2, minimum_size=60),
+		Layout(name="side",ratio=1),
+		Layout(name="Chat Log", ratio=2),
 	)
-	layout["side"].split(Layout(name="box1"), Layout(name="box2"))
+	layout["side"].split(Layout(name="Console log"), Layout(name="box2"), Layout(name="Progress"))
+	layout["footer"].split_row(
+		Layout(name="footer_left", ratio=5),
+		Layout(name="input", ratio=7),
+	)
 	return layout
+	
 
 text = Text('')
 
@@ -61,12 +66,12 @@ class Header:
 		return Panel(grid, style="black on grey70")
 input_text = ""
 layout = make_layout()
-layout["header"].update(Header())
-layout["box1"].update(Panel("This is the first box", title="Box 1"))
-layout['footer'].update(Panel(Align.left(text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
+#layout["header"].update(Header())
+#layout["box1"].update(Panel("This is the first box", title="Box 1"))
+#layout['footer'].update(Panel(Align.left(text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
 with Live(layout, refresh_per_second=10 ,screen=True) as live:
 	while True:
-		input_text = get_input()
-		layout['footer'].update(Panel(Align.left(input_text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
-	 
+		#input_text = get_input()
+		#layout['footer'].update(Panel(Align.left(input_text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
+		pass
 
