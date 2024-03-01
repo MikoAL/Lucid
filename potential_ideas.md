@@ -1,3 +1,15 @@
+
+Generalization, references are all you need.
+
+Segmentation through references, and with that, archive generalization.
+
+Conceptual example:
+Observation: 
+
+Combining the idea of self-attention mechanisms
+
+
+
 treating each collection as an object that contains information about itself
 have multiable ways of accessing the same information
 
