@@ -23,20 +23,19 @@ class MainWindows(Vertical):
         yield self.chatinput
 
 
-class ChatLog(Container):
+class ChatLog(RichLog):
 	def __init__(self):
 		super().__init__()
 		self.compose()
-		self.chatlog_window = RichLog(name="ChatLogWindow", id="ChatLogWindow")
-		self.chatlog_window.styles.outline = ("round", "white")
-		self.chatlog_window.styles.width = "auto"
-		self.chatlog_window.styles.height = "1fr"
-	def on_mount(self) -> None:
-		self.styles.height = "2fr"
+
 		self.styles.outline = ("round", "white")
 		self.styles.width = "1fr"
-	def compose(self) -> ComposeResult:
-		yield self.chatlog_window
+		self.styles.height = "2fr"
+		self.styles.align = ("center", "middle")
+		self.styles.text_align = "center"
+		self.styles.padding = 1 
+	def render(self) -> RenderResult:
+		return self
 
 
 class ChatInput(Container):
@@ -51,6 +50,7 @@ class ChatInput(Container):
 		self.input_box.styles.align = ("center", "middle")
 		self.input_box.styles.width = "1fr"
 		self.input_box.styles.height = "1fr"
+	
 	def on_input_submitted(self, message: Input.Submitted) -> None:
 		self.input_box.clear()
 		pass
@@ -74,26 +74,24 @@ class Root(App):
 		super().__init__()
 		self.dash_board = DashBoard()
 		self.main_windows = MainWindows()
-		self.chatlogs = ["Test1","Test2"]
+
 
  
 	def on_mount(self) -> None:
 		self.screen.styles.layout = "horizontal"
-		#self.chatlogs = ["Test1","Test2"]
 		pass
  
 	def compose(self) -> ComposeResult:
-		#self.dash_board = DashBoard()
-		#self.main_windows = MainWindows()
-		#self.main_windows.chatlog.chatlog_window.write("\n".join(self.chatlogs))
+
 		yield self.dash_board
 		yield self.main_windows
 
 	def on_input_submitted(self, message: Input.Submitted) -> None:
-		self.main_windows.chatlog.chatlog_window.write(message.value)
+		self.main_windows.chatlog.write(message.value)
 
-	def on_key(self) -> None:
-		#self.exit()
+	def on_key(self, event: events.Key) -> None:
+		if event.key == "escape":
+			self.exit()
 		pass
 
 if __name__ == "__main__":
