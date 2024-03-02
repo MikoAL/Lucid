@@ -1,77 +1,101 @@
-from datetime import datetime
-import time
-
-import getchlib
-
-from rich.live import Live
-from rich import box
-from rich.align import Align
-from rich.console import Console, Group
-from rich.layout import Layout
-from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
-from rich.syntax import Syntax
-from rich.table import Table
-from rich.text import Text
-
-console = Console()
-
-def typed_text(live, text):
-	global menu_text
-	typed = ""
-	for char in text:
-		typed += char
-		menu_text += char
-		time.sleep(0.5)
-		live.update(make_layout())
-
-menu_text = "Welcome to the menu!"
-
-def make_layout() -> Layout:
-	"""Define the layout."""
-	layout = Layout(name="root")
-
-	layout.split(
-		#Layout(name="header", size=3),
-		Layout(name="main", ratio=2),
-		Layout(name="footer", ratio=1),
-	)
-	layout["main"].split_row(
-		Layout(name="side",ratio=1),
-		Layout(name="Chat Log", ratio=2),
-	)
-	layout["side"].split(Layout(name="Console log"), Layout(name="box2"), Layout(name="Progress"))
-	layout["footer"].split_row(
-		Layout(name="footer_left", ratio=5),
-		Layout(name="input", ratio=7),
-	)
-	return layout
-	
-
-text = Text('')
+from textual.app import App, ComposeResult, RenderResult
+from textual.containers import Container, Horizontal, Vertical, ScrollableContainer, VerticalScroll
+from textual.widgets import Button, Footer, Header, Static, Placeholder, Welcome, Label, Input, Markdown, RichLog
+from textual.widget import Widget
+from textual import events
 
 
 
-class Header:
-	"""Display header with clock."""
+class MainWindows(Vertical):
+    def __init__(self):
+        super().__init__()
+        self.compose()
+        self.chatlog = ChatLog()
+        self.chatinput = ChatInput()
 
-	def __rich__(self) -> Panel:
-		grid = Table.grid(expand=True)
-		grid.add_column(justify="center", ratio=1)
-		grid.add_column(justify="right")
-		grid.add_row(
-			"[b]Rich[/b] Layout application",
-			datetime.now().ctime().replace(":", "[blink]:[/]"),
-		)
-		return Panel(grid, style="black on grey70")
-input_text = ""
-layout = make_layout()
-#layout["header"].update(Header())
-#layout["box1"].update(Panel("This is the first box", title="Box 1"))
-#layout['footer'].update(Panel(Align.left(text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
-with Live(layout, refresh_per_second=10 ,screen=True) as live:
-	while True:
-		#input_text = get_input()
-		#layout['footer'].update(Panel(Align.left(input_text, vertical='top'), box=box.ROUNDED, title_align='left', title='Input:'))
+    def on_mount(self) -> None:
+        self.styles.outline = ("round", "white")
+        self.styles.width = "2fr"
+
+    def compose(self) -> ComposeResult:
+
+        yield self.chatlog
+        yield self.chatinput
+
+
+class ChatLog(Container):
+	def __init__(self):
+		super().__init__()
+		self.compose()
+		self.chatlog_window = RichLog(name="ChatLogWindow", id="ChatLogWindow")
+		self.chatlog_window.styles.outline = ("round", "white")
+		self.chatlog_window.styles.width = "auto"
+		self.chatlog_window.styles.height = "1fr"
+	def on_mount(self) -> None:
+		self.styles.height = "2fr"
+		self.styles.outline = ("round", "white")
+		self.styles.width = "1fr"
+	def compose(self) -> ComposeResult:
+		yield self.chatlog_window
+
+
+class ChatInput(Container):
+	def __init__(self):
+		super().__init__()
+		self.input_box = Input()
+		self.compose()
+	def on_mount(self) -> None:
+		self.styles.height = "1fr"
+		self.styles.width = "1fr"
+		self.styles.outline = ("round", "white")
+		self.input_box.styles.align = ("center", "middle")
+		self.input_box.styles.width = "1fr"
+		self.input_box.styles.height = "1fr"
+	def on_input_submitted(self, message: Input.Submitted) -> None:
+		self.input_box.clear()
+		pass
+	def compose(self) -> ComposeResult:
+		yield self.input_box
+
+
+class DashBoard(Vertical):
+    	
+	def on_mount(self) -> None:
+		self.styles.width = "1fr"
+		self.styles.height = "1fr"
+		self.styles.outline = ("round", "white")
+  
+	def render(self) -> RenderResult:
+		return "DashBoard"
+
+class Root(App):
+	#CSS_PATH = "textual_test.tcss"
+	def __init__(self):
+		super().__init__()
+		self.dash_board = DashBoard()
+		self.main_windows = MainWindows()
+		self.chatlogs = ["Test1","Test2"]
+
+ 
+	def on_mount(self) -> None:
+		self.screen.styles.layout = "horizontal"
+		#self.chatlogs = ["Test1","Test2"]
+		pass
+ 
+	def compose(self) -> ComposeResult:
+		#self.dash_board = DashBoard()
+		#self.main_windows = MainWindows()
+		#self.main_windows.chatlog.chatlog_window.write("\n".join(self.chatlogs))
+		yield self.dash_board
+		yield self.main_windows
+
+	def on_input_submitted(self, message: Input.Submitted) -> None:
+		self.main_windows.chatlog.chatlog_window.write(message.value)
+
+	def on_key(self) -> None:
+		#self.exit()
 		pass
 
+if __name__ == "__main__":
+	app = Root()
+	app.run()

@@ -1,40 +1,67 @@
-from textual.app import App, ComposeResult
-from textual.containers import ScrollableContainer
-from textual.widgets import Button, Footer, Header, Static
+from textual.app import App, ComposeResult, RenderResult
+from textual.containers import Container, Horizontal, Vertical, ScrollableContainer, VerticalScroll
+from textual.widgets import Button, Footer, Header, Static, Placeholder, Welcome, Label
+from textual.widget import Widget
+from textual import events
 
 
-class TimeDisplay(Static):
-    """A widget to display elapsed time."""
+
+class MainWindows(Vertical):
+	def on_mount(self) -> None:
+		self.styles.outline = ("round", "white")
+		self.styles.width = "2fr"
+		pass
+
+	def compose(self) -> ComposeResult:
+			yield ChatLog()
+			yield Input()
 
 
-class Stopwatch(Static):
-    """A stopwatch widget."""
+class ChatLog(Placeholder):
+	
+	def on_mount(self) -> None:
+		self.styles.height = "2fr"
+		self.styles.outline = ("round", "white")
+		self.styles.width = "1fr"
+	def render(self) -> RenderResult:
+		return "Chat Log"
 
-    def compose(self) -> ComposeResult:
-        """Create child widgets of a stopwatch."""
-        yield Button("Start", id="start", variant="success")
-        yield Button("Stop", id="stop", variant="error")
-        yield Button("Reset", id="reset")
-        yield TimeDisplay("00:00:00.00")
+
+class Input(Placeholder):
+	
+	def on_mount(self) -> None:
+		self.styles.height = "1fr"
+		self.styles.width = "1fr"
+		self.styles.outline = ("round", "white")
+  
+	def render(self) -> RenderResult:
+		return "Input:"
+
+class DashBoard(Vertical):
+    	
+	def on_mount(self) -> None:
+		self.styles.width = "1fr"
+		self.styles.height = "1fr"
+		self.styles.outline = ("round", "white")
+  
+	def render(self) -> RenderResult:
+		return "DashBoard"
+
+class Root(App):
+	#CSS_PATH = "textual_test.tcss"
+ 
+	def on_mount(self) -> None:
+		self.screen.styles.layout = "horizontal"
+		pass
+ 
+	def compose(self) -> ComposeResult:
+		yield DashBoard()
+		yield MainWindows()
 
 
-class StopwatchApp(App):
-    """A Textual app to manage stopwatches."""
-
-    CSS_PATH = "stopwatch03.tcss"
-    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
-
-    def compose(self) -> ComposeResult:
-        """Create child widgets for the app."""
-        yield Header()
-        yield Footer()
-        yield ScrollableContainer(Stopwatch(), Stopwatch(), Stopwatch())
-
-    def action_toggle_dark(self) -> None:
-        """An action to toggle dark mode."""
-        self.dark = not self.dark
-
+	def on_key(self) -> None:
+		self.exit()
 
 if __name__ == "__main__":
-    app = StopwatchApp()
-    app.run()
+	app = Root()
+	app.run()
