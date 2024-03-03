@@ -1,14 +1,19 @@
 import os
 import time
+from time import monotonic
 import requests
 import yaml
+import httpx
 
 from textual.app import App, ComposeResult, RenderResult
 from textual.containers import Container, Horizontal, Vertical, ScrollableContainer, VerticalScroll
 from textual.widgets import Button, Footer, Header, Static, Placeholder, Welcome, Label, Input, Markdown, RichLog
 from textual.widget import Widget
+from textual.reactive import reactive
 from textual.message import Message
-from textual import events
+from textual.events import Load
+from textual import events, on, work
+
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the working directory to the script's directory
@@ -88,43 +93,64 @@ class DashBoard(Vertical):
 		self.styles.height = "1fr"
 		#self.styles.outline = ("round", "white")
 	def compose(self) -> ComposeResult:
-		yield ServerStatus()
+		self.server_status = ServerStatus()
+		yield self.server_status
 		yield Placeholder()
 		yield Placeholder()
-	#def render(self) -> RenderResult:
-	#	return ServerStatus()
+
+
 class ServerStatus(Label):
+    
 	def __init__(self):
 		super().__init__()
 		self.styles.width = "1fr"
 		self.styles.height = "1fr"
 		self.styles.margin = (1, 1)
 		self.styles.outline = ("round", "white")
-		self.renderable = "Server is not alive"
+		self.styles.content_align = ("center", "middle")
+		self.not_connected()
+	def not_connected(self):
+		self.renderable = ":red_circle: Not Connected To Server"
+		self.styles.color = "red 70%"
+	def connected(self):
+		self.renderable = ":green_circle: Connection Established"
+		self.styles.color = "green 70%"
+	 
+class ServerHandler(Widget):
+		
+	def __init__(self):
 
-  
-	#def on_mount(self) -> None:
-	#	self.styles.width = "1fr"
-	#	self.styles.height = "1fr"
-	#	self.styles.outline = ("round", "white")
-  
+		super().__init__()
+		self.display = "none"
+
 	class ServerAlive(Message):
 		def __init__(self, server_alive: bool):
 			self.server_alive = server_alive
 			super().__init__()
+	@work(exclusive=False)
+	async def send_message(message, user_name=user_name, server=server):
+		data = {'content': message, 'source': user_name, 'timestamp': time.time(), 'type': 'conversation'}
+		async with httpx.Client() as client:
+			client.post(f'{server}/postbox', json=data)
+	@work(exclusive=False)
+	async def get_display(server=server):
+		async with httpx.Client() as client:
+			response = client.get(f'{server}/display')
+			return response.json()['content']
 
-	def server_alive(self) -> None:
-		try:
-			response = requests.get(server)
-			self.post_message(self.ServerAlive(server_alive=True))
-		except requests.exceptions.RequestException as e:
-			self.post_message(self.ServerAlive(server_alive=False))
-   
-	def on_server_alive(self, message: ServerAlive) -> None:
-		if message.server_alive:
-			self.renderable = "Server is alive"
-		else:
-			self.renderable = "Server is not alive"
+	@work(exclusive=False)
+	async def check_server_alive(self) -> None:
+		async with httpx.AsyncClient() as client:
+			try:
+				response = await client.get(server)
+				if response.status_code == 200:
+					self.post_message(self.ServerAlive(server_alive=True))
+				else:
+					self.post_message(self.ServerAlive(server_alive=False))
+			except httpx.RequestError:
+				self.post_message(self.ServerAlive(server_alive=False))
+
+	
 
 
 class Root(App):
@@ -133,18 +159,29 @@ class Root(App):
 		super().__init__()
 		self.dash_board = DashBoard()
 		self.main_windows = MainWindows()
-
-
- 
+		self.server_handler = ServerHandler()
+	async def on_load(self) -> None:
+		self.set_interval(1, self.server_handler.check_server_alive)
+		pass
 	def on_mount(self) -> None:
 		self.screen.styles.layout = "horizontal"
+		self.main_windows.chatlog.write(self.css_tree) 
 		pass
  
 	def compose(self) -> ComposeResult:
-
+		yield self.server_handler
 		yield self.dash_board
 		yield self.main_windows
-
+		
+  
+	@on(ServerHandler.ServerAlive)
+	def server_alive_ui_update(self, message: ServerHandler.ServerAlive) -> None:
+		#self.dash_board.server_status.connected()
+		if message.server_alive:
+			self.dash_board.server_status.connected()
+		else:
+			self.dash_board.server_status.not_connected()
+			#self.dash_board.server_status.connected()
 	def on_input_submitted(self, message: Input.Submitted) -> None:
 		self.main_windows.chatlog.write(message.value)
 
