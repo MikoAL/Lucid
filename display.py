@@ -130,12 +130,12 @@ class ServerHandler(Widget):
 	@work(exclusive=False)
 	async def send_message(message, user_name=user_name, server=server):
 		data = {'content': message, 'source': user_name, 'timestamp': time.time(), 'type': 'conversation'}
-		async with httpx.Client() as client:
-			client.post(f'{server}/postbox', json=data)
+		async with httpx.AsyncClient() as client:
+			await client.post(f'{server}/postbox', json=data)
 	@work(exclusive=False)
 	async def get_display(server=server):
-		async with httpx.Client() as client:
-			response = client.get(f'{server}/display')
+		async with httpx.AsyncClient() as client:
+			response = await client.get(f'{server}/display')
 			return response.json()['content']
 
 	@work(exclusive=False)
@@ -145,11 +145,13 @@ class ServerHandler(Widget):
 				response = await client.get(server)
 				if response.status_code == 200:
 					self.post_message(self.ServerAlive(server_alive=True))
+					pass
 				else:
 					self.post_message(self.ServerAlive(server_alive=False))
+					pass
 			except httpx.RequestError:
 				self.post_message(self.ServerAlive(server_alive=False))
-
+				pass
 	
 
 
@@ -162,12 +164,14 @@ class Root(App):
 		self.server_handler = ServerHandler()
 	async def on_load(self) -> None:
 		self.set_interval(1, self.server_handler.check_server_alive)
+		#self.set_interval(1, self.useless_function)
 		pass
 	def on_mount(self) -> None:
 		self.screen.styles.layout = "horizontal"
 		self.main_windows.chatlog.write(self.css_tree) 
 		pass
- 
+	def useless_function(self):
+		pass
 	def compose(self) -> ComposeResult:
 		yield self.server_handler
 		yield self.dash_board
