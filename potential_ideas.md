@@ -81,6 +81,7 @@ Entries are placed on a timeline, with Summaries as entries.
     - Entry 1
     - Entry 2
     - Entry 3
+    
 A seperate Vector database will be used for querying based on events.
 Each embedding will represent a single entry.
 
