@@ -10,3 +10,8 @@ For today's progress, I have been trying to familirize myself with textual, for 
 
 # 2024/03/02
 I actually figured out how to use Textual! It took me an entire Saturday, but I figured it out.
+
+# 2024/03/06
+In the past few days, I have been busy with school.
+I have been given the deadline of June? Which means I am fucked.
+I might have to scale things down a bit.
