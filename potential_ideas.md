@@ -59,7 +59,7 @@ Working Memory is a repository containing the most recent Information Blocks. It
 ## Short-term Memory
 Short-term Memory acts as a cache for all Information Blocks that exceed the capacity of Working Memory. It stores all types of Information Blocks for future reference, including those currently in Working Memory.
 
-### Note:
+> **Note:** 
 Before a newly generated Information Block enters Working Memory, it undergoes redundancy evaluation. This evaluation involves comparing it with existing Information Blocks using cross-encoders.
 New Info Block's vector will be used to query in the Short-term Memory vector database, use cross-encoder to check for similarity, if it's above a certain threshold, we will discard the new Info Block and retrive the similar Info Block and push it into Working Memory.
 
@@ -67,12 +67,14 @@ New Info Block's vector will be used to query in the Short-term Memory vector da
 The architecture for Long-term Memory is still a WIP. One proposed solution is an Object-Oriented Memory system, which includes Entities and Event Objects.
 
 - **Entity Object:** Each individual is assigned a dedicated vector database containing all relevant Information Blocks.
-  - **person:** A person is nothing but a collection of events that they participated. By listing out all of the individual's action, we can get a numerical representaion of that person, with more recent events having a higher weight.
+  - **Person:** A person is nothing but a collection of events that they participated. By listing out all of the individual's action, we can get a numerical representaion of that person, with more recent events having a higher weight.
 - **Event Object:** Events are composed of entities Objects (if applicable), other Event Objects, and a descriptive string outlining the occurrence.
 
-Note: A person's previous interaction will have the sentence structure of "When [INSERT EVENT HERE], [INSERT NAME HERE] decided to ..."
-Note: Each entity is but a representation of past interactions.
-Note: Each Event Object is but a list of entity interactions.
+> **Note:** A person's previous interaction will have the sentence structure of "When [INSERT EVENT HERE], [INSERT NAME HERE] decided to ..."
+
+> **Note:** Each entity is but a representation of past interactions.
+
+> **Note:** Each Event Object is but a list of entity interactions.
 
 ### Diary System
 Entries are placed on a timeline, with Summaries as entries.
@@ -81,7 +83,7 @@ Entries are placed on a timeline, with Summaries as entries.
     - Entry 1
     - Entry 2
     - Entry 3
-    
+
 A seperate Vector database will be used for querying based on events.
 Each embedding will represent a single entry.
 
