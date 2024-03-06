@@ -187,11 +187,11 @@ working_memory = []
 """
 This is what a Info Block should look like
 {
-  'object_type' : 'people',
+  'object_type' : 'entity',
   'object_name' : 'Miko',
   'content' : 'Miko like Nintendo games.',
   'timestamp' : '2021-10-15 17:37:00',
-  'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32) ,
+  'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32),
 }    
 """
 # load Long-term memory from file
@@ -213,7 +213,7 @@ Lucid: Your silence speaks volumes.
 
 ```json
 {
-  "object_type" : 'people',
+  "object_type" : 'entity',
   "object_name" : 'Miko',
   "content" : 'Miko likes Nintendo games.',
 }
@@ -224,7 +224,7 @@ Lucid: Your silence speaks volumes.
 {passage}
 ```json
 {first_curly}
-  "object_type" : '{select(['people','events'], name="object_type")},
+  "object_type" : '{select(['entity','events'], name="object_type")},
   "object_name" : "{gen(stop='"',name = "object_name", temperature=temperature, top_k=top_k, top_p=top_p)},
   "content" : "{gen(stop='"',name="content", temperature=temperature, top_k=top_k, top_p=top_p)},"""  
 	return lm

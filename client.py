@@ -53,7 +53,7 @@ def display_thread():
             time.sleep(0.5)
 if __name__ == '__main__':
     t1 = Thread(target=input_thread)
-    t2 = Thread(target=display_thread)
+    #t2 = Thread(target=display_thread)
 
     t1.start()
     #t2.start()
