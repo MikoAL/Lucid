@@ -23,16 +23,17 @@ Graph a conversation
 
 Objects:
   Events
-  people
+  entities
   things?
 
 Events are made out of 
-people and smaller events
+entities and smaller events
 
 Events can have timelines?
 
----
+Given a series of conversation, what info can we learn?
 
+---
 ## Information Blocks
 Information Blocks refer to any data picked up and processed into working memory. They consist of attributes such as "content" "timestamp" and "vector"...
 ```
@@ -45,7 +46,7 @@ Lucid: Your silence speaks volumes.
 Result:
 ```python
 {
-  "object_type" : 'people',
+  "object_type" : 'entity',
   "object_name" : 'Miko',
   "content" : 'Miko likes Nintendo games.',
   "timestamp" : '2021-10-15 17:37:00',
@@ -63,10 +64,15 @@ Before a newly generated Information Block enters Working Memory, it undergoes r
 New Info Block's vector will be used to query in the Short-term Memory vector database, use cross-encoder to check for similarity, if it's above a certain threshold, we will discard the new Info Block and retrive the similar Info Block and push it into Working Memory.
 
 ## Long-term Memory
-The architecture for Long-term Memory is still a WIP. One proposed solution is an Object-Oriented Memory system, which includes People and Event Objects.
+The architecture for Long-term Memory is still a WIP. One proposed solution is an Object-Oriented Memory system, which includes Entities and Event Objects.
 
-- **People Object:** Each individual is assigned a dedicated vector database containing all relevant Information Blocks.
-- **Event Object:** Events are composed of People Objects (if applicable), other Event Objects, and a descriptive string outlining the occurrence.
+- **Entity Object:** Each individual is assigned a dedicated vector database containing all relevant Information Blocks.
+  - **person:** A person is nothing but a collection of events that they participated. By listing out all of the individual's action, we can get a numerical representaion of that person, with more recent events having a higher weight.
+- **Event Object:** Events are composed of entities Objects (if applicable), other Event Objects, and a descriptive string outlining the occurrence.
+
+Note: A person's previous interaction will have the sentence structure of "When [INSERT EVENT HERE], [INSERT NAME HERE] decided to ..."
+Note: Each entity is but a representation of past interactions.
+Note: Each Event Object is but a list of entity interactions.
 
 ### Diary System
 Entries are placed on a timeline, with Summaries as entries.
@@ -77,6 +83,12 @@ Entries are placed on a timeline, with Summaries as entries.
     - Entry 3
 A seperate Vector database will be used for querying based on events.
 Each embedding will represent a single entry.
+
+## Prediction System
+A representation of the current situation with the notation "s1"
+Given the function Predict()
+
+
 ### Conversation Mode
 In Conversation Mode, the AI can retrieve information from Long-term Memory to Working Memory and Short-term Memory.
 
