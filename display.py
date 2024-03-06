@@ -163,7 +163,7 @@ class Root(App):
 		self.main_windows = MainWindows()
 		self.server_handler = ServerHandler()
 	async def on_load(self) -> None:
-		self.set_interval(1, self.server_handler.check_server_alive)
+		self.set_interval(5, self.server_handler.check_server_alive)
 		#self.set_interval(1, self.useless_function)
 		pass
 	def on_mount(self) -> None:
