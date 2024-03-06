@@ -127,11 +127,13 @@ class ServerHandler(Widget):
 		def __init__(self, server_alive: bool):
 			self.server_alive = server_alive
 			super().__init__()
+   
 	@work(exclusive=False)
 	async def send_message(message, user_name=user_name, server=server):
 		data = {'content': message, 'source': user_name, 'timestamp': time.time(), 'type': 'conversation'}
 		async with httpx.AsyncClient() as client:
 			await client.post(f'{server}/postbox', json=data)
+	
 	@work(exclusive=False)
 	async def get_display(server=server):
 		async with httpx.AsyncClient() as client:
@@ -153,6 +155,12 @@ class ServerHandler(Widget):
 				self.post_message(self.ServerAlive(server_alive=False))
 				pass
 	
+
+# Make the entire handler on a different thread?
+# ServerHandler Functions:
+# 1. Send Message
+# 2. Get Display self.post_message
+# 3. Check Server Alive self.post_message
 
 
 class Root(App):
