@@ -6,7 +6,7 @@ user_name: Miko
 # https://rentry.org/llm-settings
 # https://huggingface.co/docs/transformers/main_classes/configuration
 llm_settings:
-  language_model: TheBloke/Nous-Hermes-2-SOLAR-10.7B-GPTQ
+  language_model: TheBloke/Tess-10.7B-v1.5b-GPTQ
   temperature : 0.8
   top_k: 50
   top_p: 1.0
