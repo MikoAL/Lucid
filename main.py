@@ -24,7 +24,7 @@ host = settings['host']
 port = settings['port']
 server = f'http://{host}:{port}'
 language_model = settings['llm_settings']['language_model']
-temperature = settings['llm_settings']['temperature']
+conversation_temperature = settings['llm_settings']['temperature']
 top_k = settings['llm_settings']['top_k']
 top_p = settings['llm_settings']['top_p']
 
@@ -32,7 +32,7 @@ logging.info('\n'.join([f"\nHost: {host}",
               f"Port: {port}",
               f"Server: {server}",
               f"Language Model: {language_model}",
-              f"Temperature: {temperature}",
+              f"Temperature: {conversation_temperature}",
               f"Top K: {top_k}",
               f"Top P: {top_p}",
               ]))
@@ -93,24 +93,27 @@ Lucid_lm = lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
 conversation=[]
-def get_conversation(conversation=conversation, retrieval_amount=8): # Get only the last few of the entire conversation, the amount determined by the var
-	prompt = ''
-	if len(conversation) == 0:
-		return 'No Record Yet.'
-	else:
-		if len(conversation)<retrieval_amount: # 4, -1,-2,-3.-4
-			for i in range(-1,-len(conversation)-1,-1):
-				prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}]{conversation[i]['source']}: {conversation[i]['content']}\n"  
-		else: 
-			for i in range(-1,-retrieval_amount-1,-1):
-				prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}]{conversation[i]['source']}: {conversation[i]['content']}\n" 
-		return prompt.strip()
+
+def get_conversation(conversation=conversation, retrieval_amount=8):
+    if len(conversation) == 0:
+        return 'No Record Yet.'
+    else:
+        prompt = ''
+        if len(conversation) < retrieval_amount:
+            for i in range(len(conversation)):
+                prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
+        else:
+            start_index = max(len(conversation) - retrieval_amount, 0)
+            for i in range(start_index, len(conversation)):
+                prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
+        return prompt.strip()
 
 # a summary of all current event, to hopefully shorten the required conversation length
 summary = 'Not Available'
 @guidance(stateless=True)
 def write_summary(lm, conversation=conversation, previous_summary=summary):
 	conversation_ = get_conversation(conversation=conversation)
+	new_line = '\n'
 	prompt = f"""\
 [Task]
 Provide a concise summary of the given conversation. Focus on key details and relevant information.
@@ -137,7 +140,7 @@ CONVERSATION:
 {conversation_}
 
 SUMMARY:
-{gen(name='summary', max_tokens=200, temperature=temperature, top_k=top_k, top_p=top_p)}"""
+{gen(name='summary', max_tokens=200, temperature=conversation_temperature, top_p=top_p, stop=new_line)}"""
 	lm += prompt
 	return lm
 def get_summary(lm=lm, conversation=conversation, previous_summary=summary):
@@ -158,6 +161,7 @@ def get_tasks(tasks=tasks):
 @guidance(stateless=True)
 def converse(lm):
 	new_line= "\n"
+	logging.debug(f"Conversation: {get_conversation()}")
 	prompt = f"""\
 [Tasks]
 {get_tasks()}
@@ -169,7 +173,7 @@ def converse(lm):
 {get_conversation()}
 
 [Output]
-Lucid: {gen(name='response', stop=new_line, temperature=temperature, top_k=top_k, top_p=top_p)}"""
+Lucid: {gen(name='response', stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
 	temp_lm = lm + prompt
 	#response = temp_lm['response']
 	return temp_lm
@@ -224,22 +228,22 @@ Lucid: Your silence speaks volumes.
 {passage}
 ```json
 {first_curly}
-  "object_type" : '{select(['entity','events'], name="object_type")},
-  "object_name" : "{gen(stop='"',name = "object_name", temperature=temperature, top_k=top_k, top_p=top_p)},
-  "content" : "{gen(stop='"',name="content", temperature=temperature, top_k=top_k, top_p=top_p)},"""  
+  "object_type" : '{select(['entity','event'], name="object_type")},
+  "object_name" : "{gen(stop='"',name = "object_name", temperature=conversation_temperature,  top_p=top_p)},
+  "content" : "{gen(stop='"',name="content", temperature=conversation_temperature,  top_p=top_p)},"""  
 	return lm
 
 def make_new_info_block(lm, passage):
   lm += guidance_make_new_info_block(passage)
   timestamp = date.fromtimestamp(time.time())
-  json_file ={
+  info_block ={
   "object_type" : lm['object_type'],
   "object_name" : lm['object_name'],
   "content" : lm['content'],
   "timestamp" : timestamp,
   "vector" : sentence_transformer.encode([lm['content']]),
   }
-  return json_file
+  return info_block
 
 @guidance(stateless=True)
 def guidance_generate_fake_answer(lm, query):
@@ -260,7 +264,7 @@ Answer: "The play 'Romeo and Juliet' was written by William Shakespeare."
 [End of Example]
 
 Question: "{query}"
-Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=temperature, top_k=top_k, top_p=top_p)}"""
+Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
 	lm += prompt
 	return lm
 
@@ -268,14 +272,18 @@ def generate_fake_answer(lm, query):
 	lm += guidance_generate_fake_answer(query)
 	return ('"'+lm['Answer']).strip('"')
 
+def without_keys(d, keys):
+    return {k: v for k, v in d.items() if k not in keys}
+
 def push_info_block_to_short_term_memory(info_block):
 	global short_term_memory
 	global short_term_memory_uid
+	info_block_no_vector = without_keys(info_block, ['vector'])
 	short_term_memory.add(
 		ids=[short_term_memory_uid],
 		documents=[info_block],
 		embeddings=[info_block['vector']],
-		metadata=[info_block],
+		metadata=[info_block_no_vector],
 	)
 	short_term_memory_uid += 1
 # Chroma stuff end
@@ -315,7 +323,7 @@ while True:
 					logging.debug(f'Got mail: {mail_}')
 				case _:
 					tmp_mail_type = mail_['type']
-					logging.WARNING(f'Received mail with type \"{tmp_mail_type}\"\n{mail_}')
+					logging.WARNING(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
 					pass
 
 		# generate response
@@ -333,7 +341,7 @@ while True:
 		play_audio(response['content'])
   
 		# Check how many times it has been since the last summary
-		if times_without_summary < 4:
+		if times_without_summary < 0:
 			times_without_summary += 1
 		else:
 			summary = get_summary(lm=lm, conversation=conversation)
