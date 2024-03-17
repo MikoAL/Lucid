@@ -120,17 +120,17 @@ Provide a concise summary of the given conversation. Focus on key details and re
 
 [Example]
 PREVIOUS SUMMARY:
-#Person1# and #Person2# are both in the same bar, sitting next to each other, when #Person1# noticed his keys were gone.
+Person1 and Person2 are both in the same bar, sitting next to each other, when Person1 noticed his keys were gone.
 
 CONVERSATION:
-#Person1#: Excuse me, did you see a set of keys? 
-#Person2#: What kind of keys? 
-#Person1#: Five keys and a small foot ornament. 
-#Person2#: What a shame! I didn't see them. 
-#Person1#: Well, can you help me look for it? That's my first time here. 
+Person1: Excuse me, did you see a set of keys? 
+Person2: What kind of keys? 
+Person1: Five keys and a small foot ornament. 
+Person2: What a shame! I didn't see them. 
+Person1: Well, can you help me look for it? That's my first time here. 
 
 SUMMARY:
-#Person1# is looking for a set of keys and seeks #Person2#'s assistance in finding them. #Person2# expresses regret for not having seen the keys and is willing to help in the search.
+Person1 is looking for a set of keys and seeks Person2's assistance in finding them. Person2 expresses regret for not having seen the keys and is willing to help in the search.
 
 [OUTPUT]
 PREVIOUS SUMMARY:

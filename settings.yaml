@@ -6,7 +6,7 @@ user_name: Miko
 # https://rentry.org/llm-settings
 # https://huggingface.co/docs/transformers/main_classes/configuration
 llm_settings:
-  language_model: TheBloke/Tess-10.7B-v1.5b-GPTQ
+  language_model: macadeliccc/laser-dolphin-mixtral-4x7b-dpo-AWQ
   temperature : 0.8
   top_k: 50
   top_p: 1.0

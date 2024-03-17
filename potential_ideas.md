@@ -36,7 +36,7 @@ Given a series of conversation, what info can we learn?
 
 
 1. **Information Blocks:**
-   - Attributes: Content, Timestamp, Vector
+   - Attributes: Object type, Object name, Content, Timestamp, Vector
    - Example with dialogue data and corresponding result
 
 2. **Working Memory:**
