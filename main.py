@@ -111,7 +111,7 @@ def get_conversation(conversation=conversation, retrieval_amount=8):
 # a summary of all current event, to hopefully shorten the required conversation length
 summary = 'Not Available'
 @guidance(stateless=True)
-def write_summary(clean_lm, conversation=conversation, previous_summary=summary):
+def write_summary(lm, conversation=conversation, previous_summary=summary):
 	conversation_ = get_conversation(conversation=conversation)
 	new_line = '\n'
 	prompt = f"""\
@@ -141,7 +141,7 @@ CONVERSATION:
 
 SUMMARY:
 {gen(name='summary', max_tokens=200, temperature=conversation_temperature, top_p=top_p, stop=new_line)}"""
-	temp_lm =clean_lm + prompt
+	temp_lm = lm + prompt
 	return temp_lm
 def get_summary(clean_lm=clean_lm, conversation=conversation, previous_summary=summary):
 	temp_lm = clean_lm + write_summary(conversation=conversation, previous_summary=previous_summary)
@@ -159,7 +159,7 @@ def get_tasks(tasks=tasks):
 
 # This is for generating a response
 @guidance(stateless=False)
-def guidance_converse(Lucid_lm=Lucid_lm):
+def guidance_converse(lm):
 	new_line= "\n"
 	logging.debug(f"Conversation: {get_conversation()}")
 	prompt = f"""\
@@ -174,11 +174,11 @@ def guidance_converse(Lucid_lm=Lucid_lm):
 
 [Output]
 Lucid: {gen(name='response', stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
-	temp_lm = Lucid_lm + prompt
+	temp_lm = lm + prompt
 	#response = temp_lm['response']
 	return temp_lm
 def converse(Lucid_lm=Lucid_lm):
-	temp_lm = guidance_converse(Lucid_lm=Lucid_lm)
+	temp_lm = Lucid_lm + guidance_converse()
 	return temp_lm['response']
 
 # ============================ #
@@ -274,12 +274,12 @@ def generate_fake_answer(clean_lm, query):
 	temp_lm = clean_lm + guidance_generate_fake_answer(query)
 	return ('"'+temp_lm['Answer']).strip('"')
 @guidance(stateless=True)
-def guidance_check_for_new_info(clean_lm, conversation = conversation, working_memory = working_memory):
+def guidance_check_for_new_info(lm, conversation = conversation, working_memory = working_memory):
 	new_line = '\n'
 	working_memory_prompt = ""
 	for info_block in working_memory:
 		working_memory_prompt += "- " + info_block['content'] + "\n"
-	temp_lm = clean_lm + f"""\
+	temp_lm = lm + f"""\
 [System]
 You are a helpful assistant. You specialize in checking if there is any new information in the conversation that is not in working memory.
 
