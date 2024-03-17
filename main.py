@@ -29,13 +29,13 @@ top_k = settings['llm_settings']['top_k']
 top_p = settings['llm_settings']['top_p']
 
 logging.info('\n'.join([f"\nHost: {host}",
-              f"Port: {port}",
-              f"Server: {server}",
-              f"Language Model: {language_model}",
-              f"Temperature: {conversation_temperature}",
-              f"Top K: {top_k}",
-              f"Top P: {top_p}",
-              ]))
+			  f"Port: {port}",
+			  f"Server: {server}",
+			  f"Language Model: {language_model}",
+			  f"Temperature: {conversation_temperature}",
+			  f"Top K: {top_k}",
+			  f"Top P: {top_p}",
+			  ]))
 
 # ============================ #
 # Server stuff
@@ -60,7 +60,7 @@ def send_output(output, server=server):
 
 from guidance import models, gen, select
 import guidance
-lm = models.Transformers(language_model, device_map="cuda", echo=False)
+clean_lm = models.Transformers(language_model, device_map="cuda", echo=False)
 
 prompt_path = r".\Prompts"
 
@@ -89,29 +89,29 @@ You are Lucid, a versatile AI created by Miko, for the purpose of helping him. Y
 While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
 You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
 
-Lucid_lm = lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
+Lucid_lm = clean_lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
 conversation=[]
 
 def get_conversation(conversation=conversation, retrieval_amount=8):
-    if len(conversation) == 0:
-        return 'No Record Yet.'
-    else:
-        prompt = ''
-        if len(conversation) < retrieval_amount:
-            for i in range(len(conversation)):
-                prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
-        else:
-            start_index = max(len(conversation) - retrieval_amount, 0)
-            for i in range(start_index, len(conversation)):
-                prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
-        return prompt.strip()
+	if len(conversation) == 0:
+		return 'No Record Yet.'
+	else:
+		prompt = ''
+		if len(conversation) < retrieval_amount:
+			for i in range(len(conversation)):
+				prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
+		else:
+			start_index = max(len(conversation) - retrieval_amount, 0)
+			for i in range(start_index, len(conversation)):
+				prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
+		return prompt.strip()
 
 # a summary of all current event, to hopefully shorten the required conversation length
 summary = 'Not Available'
 @guidance(stateless=True)
-def write_summary(lm, conversation=conversation, previous_summary=summary):
+def write_summary(clean_lm, conversation=conversation, previous_summary=summary):
 	conversation_ = get_conversation(conversation=conversation)
 	new_line = '\n'
 	prompt = f"""\
@@ -141,11 +141,11 @@ CONVERSATION:
 
 SUMMARY:
 {gen(name='summary', max_tokens=200, temperature=conversation_temperature, top_p=top_p, stop=new_line)}"""
-	lm += prompt
-	return lm
-def get_summary(lm=lm, conversation=conversation, previous_summary=summary):
-	lm+=write_summary(conversation=conversation, previous_summary=previous_summary)
-	return lm['summary']
+	temp_lm =clean_lm + prompt
+	return temp_lm
+def get_summary(clean_lm=clean_lm, conversation=conversation, previous_summary=summary):
+	temp_lm = clean_lm + write_summary(conversation=conversation, previous_summary=previous_summary)
+	return temp_lm['summary']
 # the main tasks, defaults to be a good assistant to Miko or something like that.
 tasks = []
 def get_tasks(tasks=tasks):
@@ -158,8 +158,8 @@ def get_tasks(tasks=tasks):
 		return prompt.strip()
 
 # This is for generating a response
-@guidance(stateless=True)
-def converse(lm):
+@guidance(stateless=False)
+def guidance_converse(Lucid_lm=Lucid_lm):
 	new_line= "\n"
 	logging.debug(f"Conversation: {get_conversation()}")
 	prompt = f"""\
@@ -174,9 +174,12 @@ def converse(lm):
 
 [Output]
 Lucid: {gen(name='response', stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
-	temp_lm = lm + prompt
+	temp_lm = Lucid_lm + prompt
 	#response = temp_lm['response']
 	return temp_lm
+def converse(Lucid_lm=Lucid_lm):
+	temp_lm = guidance_converse(Lucid_lm=Lucid_lm)
+	return temp_lm['response']
 
 # ============================ #
 # Chroma stuff
@@ -199,7 +202,7 @@ This is what a Info Block should look like
 }    
 """
 # load Long-term memory from file
-
+# WIP
 
 
 @guidance(stateless=True)
@@ -209,11 +212,11 @@ def guidance_make_new_info_block(lm, passage):
 	lm += """\
 This is what a Info Block should look like from an example:
 [Example]
-Lucid: What are you doing now? Stop ignoring me!
-Miko: I'm playing Nintendo games.
-Lucid: And that's a higher priority than me?
-Miko: ...
-Lucid: Your silence speaks volumes.
+[2024/02/16] Lucid: What are you doing now? Stop ignoring me!
+[2024/02/16] Miko: I'm playing Nintendo games.
+[2024/02/16] Lucid: And that's a higher priority than me?
+[2024/02/16] Miko: ...
+[2024/02/16] Lucid: Your silence speaks volumes.
 
 ```json
 {
@@ -233,8 +236,8 @@ Lucid: Your silence speaks volumes.
   "content" : "{gen(stop='"',name="content", temperature=conversation_temperature,  top_p=top_p)},"""  
 	return lm
 
-def make_new_info_block(lm, passage):
-  lm += guidance_make_new_info_block(passage)
+def make_new_info_block(clean_lm, passage):
+  lm = clean_lm + guidance_make_new_info_block(passage)
   timestamp = date.fromtimestamp(time.time())
   info_block ={
   "object_type" : lm['object_type'],
@@ -267,13 +270,64 @@ Question: "{query}"
 Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
 	lm += prompt
 	return lm
+def generate_fake_answer(clean_lm, query):
+	temp_lm = clean_lm + guidance_generate_fake_answer(query)
+	return ('"'+temp_lm['Answer']).strip('"')
+@guidance(stateless=True)
+def guidance_check_for_new_info(clean_lm, conversation = conversation, working_memory = working_memory):
+	new_line = '\n'
+	working_memory_prompt = ""
+	for info_block in working_memory:
+		working_memory_prompt += "- " + info_block['content'] + "\n"
+	temp_lm = clean_lm + f"""\
+[System]
+You are a helpful assistant. You specialize in checking if there is any new information in the conversation that is not in working memory.
 
-def generate_fake_answer(lm, query):
-	lm += guidance_generate_fake_answer(query)
-	return ('"'+lm['Answer']).strip('"')
+[Example]
+
+[Example Working Memory]
+- Person 1 is going to the store.
+
+[Example Conversation]
+[2023/06/23] Person1: I'm going to the store.
+[2023/06/23] Person2: What are you going to buy?
+[2023/06/23] Person1: I'm going to buy some apples and oranges.
+[2023/06/23] Person2: I heard that the store has a sale on bananas today.
+
+[Example Checking for New Information]
+Is there any new information that I should know about?
+Yes.
+- There is a sale on bananas at the store in 2023/06/23 according to Person2.
+
+[End of Example]
+
+[Working Memory]
+{working_memory_prompt.strip()}
+
+[Conversation]
+{get_conversation(conversation=conversation)}
+
+[Output]
+Is there any new information that I should know about?
+"""
+	temp_lm += select(['Yes','No'], name="Yes_or_No")
+	if (temp_lm['Yes_or_No']) == 'No':
+		return temp_lm
+	else:
+		temp_lm += f"""\
+\n - {gen(name='new_info',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
+		return temp_lm['new_info']
+
+def check_for_new_info(clean_lm, conversation = conversation, working_memory = working_memory):
+	temp_lm = clean_lm+guidance_check_for_new_info(conversation=conversation, working_memory=working_memory)
+	return temp_lm['new_info']
+
+
+
+
 
 def without_keys(d, keys):
-    return {k: v for k, v in d.items() if k not in keys}
+	return {k: v for k, v in d.items() if k not in keys}
 
 def push_info_block_to_short_term_memory(info_block):
 	global short_term_memory
@@ -304,6 +358,7 @@ def play_audio(text):
 last_get_mail_time= 0
 new_mail = []
 times_without_summary = 0
+working_memory = []
 while True:
 
 	
@@ -328,15 +383,14 @@ while True:
 
 		# generate response
 		logging.debug('generating response')
-		tmp = Lucid_lm + converse()
+		generated_response=converse()
 		response = {
-      			'source' : 'Lucid',
-            	'content' : tmp['response'],
-            	'timestamp' : time.time(),
-            	'type' : 'conversation',
-            	}
-		logging.debug(f"generated response:\n{tmp['response']}")
-		del(tmp)
+	  			'source' : 'Lucid',
+				'content' : generated_response,
+				'timestamp' : time.time(),
+				'type' : 'conversation',
+				}
+		logging.debug(f"generated response:\n{generated_response}")
 		conversation.append(response)
 		play_audio(response['content'])
   
@@ -344,7 +398,7 @@ while True:
 		if times_without_summary < 0:
 			times_without_summary += 1
 		else:
-			summary = get_summary(lm=lm, conversation=conversation)
+			summary = get_summary()
 			logging.debug(f"Generated summary:\n{summary}")
 			times_without_summary = 0
 		#send_output(output=response)
