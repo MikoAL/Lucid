@@ -184,8 +184,8 @@ def converse(Lucid_lm=Lucid_lm):
 # ============================ #
 # Chroma stuff
 import chromadb
-from sentence_transformers import SentenceTransformer
-
+from sentence_transformers import SentenceTransformer, CrossEncoder
+cross_e = CrossEncoder("cross-encoder/stsb-distilroberta-base", device="cuda")
 sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 short_term_memory = chromadb.Client()
 short_term_memory_uid = 1
@@ -316,11 +316,14 @@ Is there any new information that I should know about?
 	else:
 		temp_lm += f"""\
 \n - {gen(name='new_info',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
-		return temp_lm['new_info']
+		return temp_lm
 
-def check_for_new_info(clean_lm, conversation = conversation, working_memory = working_memory):
+def check_for_new_info(clean_lm = clean_lm, conversation = conversation, working_memory = working_memory):
 	temp_lm = clean_lm+guidance_check_for_new_info(conversation=conversation, working_memory=working_memory)
-	return temp_lm['new_info']
+	if temp_lm['Yes_or_No'] == 'No':
+		return "No new information."
+	else:
+		return temp_lm['new_info']
 
 
 
@@ -359,6 +362,7 @@ last_get_mail_time= 0
 new_mail = []
 times_without_summary = 0
 working_memory = []
+summaries = []
 while True:
 
 	
@@ -401,6 +405,10 @@ while True:
 			summary = get_summary()
 			logging.debug(f"Generated summary:\n{summary}")
 			times_without_summary = 0
+			# Graph the summary or something
+			summaries.append(summary)
+			# If the cosine similarity between the last two summaries is less than a threshold, then we should maybe create a new info block
+			summaries_cross_encoder_result = hihihihi
 		#send_output(output=response)
 
 	
