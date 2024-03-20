@@ -5,6 +5,8 @@ import yaml
 import os
 import logging
 from datetime import date
+import numpy as np
+
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p')
 #logging.disable()
 # Get the absolute path of the script's directory
@@ -148,7 +150,7 @@ def get_summary(clean_lm=clean_lm, conversation=conversation, previous_summary=s
 	return temp_lm['summary']
 # the main tasks, defaults to be a good assistant to Miko or something like that.
 tasks = []
-def get_tasks(tasks=tasks):
+def get_tasks(tasks=tasks) -> str:
 	if len(tasks)==0:
 		return '- Be a good friend to Miko.'
 	else:
@@ -159,12 +161,15 @@ def get_tasks(tasks=tasks):
 
 # This is for generating a response
 @guidance(stateless=False)
-def guidance_converse(lm):
+def guidance_converse(lm, working_memory=working_memory):
 	new_line= "\n"
 	logging.debug(f"Conversation: {get_conversation()}")
 	prompt = f"""\
 [Tasks]
 {get_tasks()}
+
+[Working Memory]
+{working_memory}
 
 [Summary Of Previous Conversation]
 {summary}
@@ -177,7 +182,7 @@ Lucid: {gen(name='response', stop=new_line, temperature=conversation_temperature
 	temp_lm = lm + prompt
 	#response = temp_lm['response']
 	return temp_lm
-def converse(Lucid_lm=Lucid_lm):
+def converse(Lucid_lm=Lucid_lm) -> str:
 	temp_lm = Lucid_lm + guidance_converse()
 	return temp_lm['response']
 
@@ -185,7 +190,7 @@ def converse(Lucid_lm=Lucid_lm):
 # Chroma stuff
 import chromadb
 from sentence_transformers import SentenceTransformer, CrossEncoder
-cross_e = CrossEncoder("cross-encoder/stsb-distilroberta-base", device="cuda")
+cross_encoder = CrossEncoder("cross-encoder/stsb-distilroberta-base", device="cuda")
 sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 short_term_memory = chromadb.Client()
 short_term_memory_uid = 1
@@ -270,15 +275,20 @@ Question: "{query}"
 Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
 	lm += prompt
 	return lm
-def generate_fake_answer(clean_lm, query):
+def generate_fake_answer(clean_lm, query) -> str:
 	temp_lm = clean_lm + guidance_generate_fake_answer(query)
 	return ('"'+temp_lm['Answer']).strip('"')
 @guidance(stateless=True)
 def guidance_check_for_new_info(lm, conversation = conversation, working_memory = working_memory):
 	new_line = '\n'
 	working_memory_prompt = ""
-	for info_block in working_memory:
-		working_memory_prompt += "- " + info_block['content'] + "\n"
+	if len(working_memory) == 0:
+		working_memory_prompt = 'No Record Yet.'
+	else:
+		prompt = ''
+		for i in working_memory:
+			prompt+=f'- {i['content']}\n'
+		working_memory_prompt = prompt.strip()
 	temp_lm = lm + f"""\
 [System]
 You are a helpful assistant. You specialize in checking if there is any new information in the conversation that is not in working memory.
@@ -302,7 +312,7 @@ Yes.
 [End of Example]
 
 [Working Memory]
-{working_memory_prompt.strip()}
+{working_memory_prompt}
 
 [Conversation]
 {get_conversation(conversation=conversation)}
@@ -318,7 +328,7 @@ Is there any new information that I should know about?
 \n - {gen(name='new_info',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
 		return temp_lm
 
-def check_for_new_info(clean_lm = clean_lm, conversation = conversation, working_memory = working_memory):
+def check_for_new_info(clean_lm = clean_lm, conversation = conversation, working_memory = working_memory) -> str:
 	temp_lm = clean_lm+guidance_check_for_new_info(conversation=conversation, working_memory=working_memory)
 	if temp_lm['Yes_or_No'] == 'No':
 		return "No new information."
@@ -326,13 +336,20 @@ def check_for_new_info(clean_lm = clean_lm, conversation = conversation, working
 		return temp_lm['new_info']
 
 
-
+def get_working_memory(working_memory=working_memory) -> str:
+	if len(working_memory) == 0:
+		return 'No Record Yet.'
+	else:
+		prompt = ''
+		for i in working_memory:
+			prompt+=f'- {i['content']}\n'
+		return prompt.strip()
 
 
 def without_keys(d, keys):
 	return {k: v for k, v in d.items() if k not in keys}
 
-def push_info_block_to_short_term_memory(info_block):
+def push_info_block_to_short_term_memory(info_block) ->bool:
 	global short_term_memory
 	global short_term_memory_uid
 	info_block_no_vector = without_keys(info_block, ['vector'])
@@ -343,6 +360,7 @@ def push_info_block_to_short_term_memory(info_block):
 		metadata=[info_block_no_vector],
 	)
 	short_term_memory_uid += 1
+	return True # This value represents if it was accepted or not
 # Chroma stuff end
 # ============================ #
 # Temp TTS stuff
@@ -363,6 +381,7 @@ new_mail = []
 times_without_summary = 0
 working_memory = []
 summaries = []
+summaries_cross_encoder_result = []
 while True:
 
 	
@@ -397,7 +416,17 @@ while True:
 		logging.debug(f"generated response:\n{generated_response}")
 		conversation.append(response)
 		play_audio(response['content'])
-  
+		
+		# Check for new info
+		new_info_check = check_for_new_info()
+		if new_info_check == "No new information.":
+			logging.debug("No new information.")
+		else:
+			new_info = new_info_check
+			new_info_block = make_new_info_block(passage=(get_conversation()+"\n\n"+new_info))
+			accepted = push_info_block_to_short_term_memory(new_info_block)
+			if accepted:
+				working_memory.append(new_info_block)
 		# Check how many times it has been since the last summary
 		if times_without_summary < 0:
 			times_without_summary += 1
@@ -408,7 +437,12 @@ while True:
 			# Graph the summary or something
 			summaries.append(summary)
 			# If the cosine similarity between the last two summaries is less than a threshold, then we should maybe create a new info block
-			summaries_cross_encoder_result = hihihihi
+			# Or if the cosine similarity between the second last summary and the newest few dialog is less than a threshold, then we should maybe create a new info block
+			if len(summaries) >= 2:
+				#summaries_cross_encoder_result.append(cross_encoder([summaries[-2], summaries[-1]]))
+				pass
+			
+		
 		#send_output(output=response)
 
 	
