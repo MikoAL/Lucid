@@ -95,7 +95,7 @@ Lucid_lm = clean_lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
 conversation=[]
-
+working_memory = []
 def get_conversation(conversation=conversation, retrieval_amount=8):
 	if len(conversation) == 0:
 		return 'No Record Yet.'
@@ -195,7 +195,7 @@ sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-
 short_term_memory = chromadb.Client()
 short_term_memory_uid = 1
 #client = chromadb.PersistentClient(path="./Chroma")
-working_memory = []
+
 """
 This is what a Info Block should look like
 {
@@ -379,7 +379,6 @@ def play_audio(text):
 last_get_mail_time= 0
 new_mail = []
 times_without_summary = 0
-working_memory = []
 summaries = []
 summaries_cross_encoder_result = []
 while True:
