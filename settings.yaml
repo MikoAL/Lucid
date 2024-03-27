@@ -11,4 +11,3 @@ llm_settings:
   top_k: 50
   top_p: 1.0
   repetition_penalty: 1.2
-  
