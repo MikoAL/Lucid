@@ -10,7 +10,21 @@ import httpx
 from dotenv import load_dotenv
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+
+
+# Get the absolute path of the script's directory
+script_dir = os.path.dirname(os.path.realpath(__file__))
+# Change the working directory to the script's directory
+os.chdir(script_dir)
+
+# Reading from a YAML file
+with open('settings.yaml', 'r') as file:
+    settings = yaml.safe_load(file)
+
+host = settings['host']
+port = settings['port']
+server = f'http://{host}:{port}'
 
 
 load_dotenv()
@@ -21,6 +35,8 @@ intents = discord.Intents.all()
  
 bot = commands.Bot(command_prefix='!', intents=intents)
 Lucid_channel_id = int("1222433056778879016")
+
+client = httpx.AsyncClient()
 
 @bot.event
 async def on_ready():
@@ -41,21 +57,33 @@ async def on_message(message):
     if message.channel.id == Lucid_channel_id:
         # This function will be called whenever a message is sent in the specified channel
         if message.author != bot.user:
-            await process_message(message)
+            formatted_message = {'content':message.content,'source':message.author.name,'timestamp':time.time(), 'type':'conversation'}
+            await send_user_message_to_server(formatted_message)
             
-async def process_message(message):
-    # Your custom processing logic for the message goes here
-    # For example, you can print the content of the message
-    print(message)
-    print(f"{message.author.name}: {message.content}")
-    await send_message("I received your message: " + message.content, message.channel.id)
 """
 For the bot to collect all the messages sent in a channel.
 
 
 """
-async def send_message(message, channel_id=Lucid_channel_id):
+async def send_user_message_to_server(formatted_json: dict, server=server):
+    print(f"Got message from {formatted_json['source']}: {formatted_json['content']}")
+    await client.post(url=f'{server}/postbox', json=(formatted_json))
+
+async def send_ai_response_to_discord(message, channel_id=Lucid_channel_id):
+    print(f"Sending message to channel")
     await bot.get_channel(channel_id).send(message)
+
+async def get_ai_response_from_server(server=server):
+    server_response = ((await client.get(url=f'{server}/display')).json())['content']
+    print(f"Server response: {server_response}")
+    return server_response
+
+
+@tasks.loop(seconds=0.1)
+async def get_ai_response():
+    response = await get_ai_response_from_server()
+    if response != '':
+        await send_ai_response_to_discord(response)
 
 if __name__ == '__main__':
     bot.run(TOKEN)

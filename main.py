@@ -112,7 +112,7 @@ def get_conversation(conversation=conversation, retrieval_amount=8):
 
 # a summary of all current event, to hopefully shorten the required conversation length
 summary = 'Not Available'
-@guidance(stateless=True)
+@guidance(stateless=False)
 def write_summary(lm, conversation=conversation, previous_summary=summary):
 	conversation_ = get_conversation(conversation=conversation)
 	new_line = '\n'
@@ -210,7 +210,7 @@ This is what a Info Block should look like
 # WIP
 
 
-@guidance(stateless=True)
+@guidance(stateless=False)
 def guidance_make_new_info_block(lm, passage):
 	first_curly = "{"
 	second_curly = "}"
@@ -253,7 +253,7 @@ def make_new_info_block(clean_lm, passage):
   }
   return info_block
 
-@guidance(stateless=True)
+@guidance(stateless=False)
 def guidance_generate_fake_answer(lm, query):
 	new_line = '\n'
 	prompt = f"""\
@@ -278,7 +278,7 @@ Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=conversat
 def generate_fake_answer(clean_lm, query) -> str:
 	temp_lm = clean_lm + guidance_generate_fake_answer(query)
 	return ('"'+temp_lm['Answer']).strip('"')
-@guidance(stateless=True)
+@guidance(stateless=False)
 def guidance_check_for_new_info(lm, conversation = conversation, working_memory = working_memory):
 	new_line = '\n'
 	working_memory_prompt = ""
@@ -286,9 +286,10 @@ def guidance_check_for_new_info(lm, conversation = conversation, working_memory 
 		working_memory_prompt = 'No Record Yet.'
 	else:
 		prompt = ''
-		for i in working_memory:
-			prompt+=f'- {i['content']}\n'
-		working_memory_prompt = prompt.strip()
+		if len(working_memory) != 0:
+			for i in working_memory:
+				prompt+=f'- {i["content"]}\n'
+			working_memory_prompt = prompt.strip()
 	temp_lm = lm + f"""\
 [System]
 You are a helpful assistant. You specialize in checking if there is any new information in the conversation that is not in working memory.
@@ -342,7 +343,7 @@ def get_working_memory(working_memory=working_memory) -> str:
 	else:
 		prompt = ''
 		for i in working_memory:
-			prompt+=f'- {i['content']}\n'
+			prompt+=f'- {i["content"]}\n'
 		return prompt.strip()
 
 
@@ -442,6 +443,6 @@ while True:
 				pass
 			
 		
-		#send_output(output=response)
+		send_output(output=response)
 
 	
