@@ -17,6 +17,7 @@ class Output(BaseModel):
     source: str | None = 'Lucid'
     timestamp: float | None = time.time()
     
+
     
 app = FastAPI()
 
