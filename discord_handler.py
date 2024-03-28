@@ -51,6 +51,7 @@ async def on_ready():
 
     members = '\n - '.join([member.name for member in guild.members])
     print(f'Guild Members:\n - {members}')
+    get_ai_response_loop.start()
     
 @bot.event
 async def on_message(message):
@@ -58,7 +59,8 @@ async def on_message(message):
         # This function will be called whenever a message is sent in the specified channel
         if message.author != bot.user:
             formatted_message = {'content':message.content,'source':message.author.name,'timestamp':time.time(), 'type':'conversation'}
-            await send_user_message_to_server(formatted_message)
+            async with bot.get_channel(Lucid_channel_id).typing():
+                await send_user_message_to_server(formatted_message)
             
 """
 For the bot to collect all the messages sent in a channel.
@@ -75,15 +77,21 @@ async def send_ai_response_to_discord(message, channel_id=Lucid_channel_id):
 
 async def get_ai_response_from_server(server=server):
     server_response = ((await client.get(url=f'{server}/display')).json())['content']
-    print(f"Server response: {server_response}")
+    #print(f"Server response: {server_response}")
     return server_response
 
 
 @tasks.loop(seconds=0.1)
-async def get_ai_response():
-    response = await get_ai_response_from_server()
-    if response != '':
-        await send_ai_response_to_discord(response)
+async def get_ai_response_loop():
+    #print("Getting response from server")
+    try:
+        response = await get_ai_response_from_server()
+        if response != '':
+            print(f"Got response: {response}")
+            await send_ai_response_to_discord(response)
+    except Exception as e:
+        print(f"Error: {e}")
+        pass
 
 if __name__ == '__main__':
     bot.run(TOKEN)

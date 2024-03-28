@@ -415,6 +415,7 @@ while True:
 				}
 		logging.debug(f"generated response:\n{generated_response}")
 		conversation.append(response)
+		send_output(output=response)
 		play_audio(response['content'])
 		
 		# Check for new info
@@ -443,6 +444,6 @@ while True:
 				pass
 			
 		
-		send_output(output=response)
+		
 
 	

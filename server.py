@@ -55,7 +55,7 @@ async def test(test):
 @app.post("/output") # Needs a more creative name, and I'm not even sure if I should put it here
 async def output(output: Output):
     global new_message
-    #logging.INFO(f'Lucid: {output.content}')
+    logging.info(f'Lucid: {output.content}')
     new_message=output
     return 
 
