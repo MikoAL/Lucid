@@ -57,7 +57,9 @@ def get_mail(server=server): # mail format {'content':content,'source':source,'t
 
 def send_output(output, server=server):
 	requests.post(url=f"{server}/output",json=output)   
-	 
+
+def send_summary(summary, server=server):
+	requests.post(url=f"{server}/discord/post_summary",json=summary)
 # ============================ #
 
 from guidance import models, gen, select
@@ -434,6 +436,7 @@ while True:
 		else:
 			summary = get_summary()
 			logging.debug(f"Generated summary:\n{summary}")
+			send_summary({'content':summary})
 			times_without_summary = 0
 			# Graph the summary or something
 			summaries.append(summary)

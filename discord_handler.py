@@ -32,11 +32,15 @@ TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 GUILD = os.getenv('DISCORD_GUILD_ID')
 
 intents = discord.Intents.all()
- 
-bot = commands.Bot(command_prefix='!', intents=intents)
+command_prefix = '/'
+bot = commands.Bot(command_prefix=command_prefix, intents=intents)
 Lucid_channel_id = int("1222433056778879016")
 
 client = httpx.AsyncClient()
+
+
+
+new_summary = "No summary available."
 
 @bot.event
 async def on_ready():
@@ -52,16 +56,24 @@ async def on_ready():
     members = '\n - '.join([member.name for member in guild.members])
     print(f'Guild Members:\n - {members}')
     get_ai_response_loop.start()
+    get_new_summary_loop.start()
     
 @bot.event
 async def on_message(message):
+    if message.content[0] == "/":
+        await bot.process_commands(message)
+        return
     if message.channel.id == Lucid_channel_id:
         # This function will be called whenever a message is sent in the specified channel
         if message.author != bot.user:
             formatted_message = {'content':message.content,'source':message.author.name,'timestamp':time.time(), 'type':'conversation'}
             async with bot.get_channel(Lucid_channel_id).typing():
                 await send_user_message_to_server(formatted_message)
-            
+
+@bot.command(name='summary')
+async def get_summary(ctx):
+    global new_summary
+    await ctx.send(new_summary)
 """
 For the bot to collect all the messages sent in a channel.
 
@@ -80,6 +92,9 @@ async def get_ai_response_from_server(server=server):
     #print(f"Server response: {server_response}")
     return server_response
 
+async def get_summary_from_server(server=server):
+    server_response = ((await client.get(url=f'{server}/discord/get_summary')).json())['content']
+    return server_response
 
 @tasks.loop(seconds=0.1)
 async def get_ai_response_loop():
@@ -93,6 +108,17 @@ async def get_ai_response_loop():
         print(f"Error: {e}")
         pass
 
+@tasks.loop(seconds=0.1)
+async def get_new_summary_loop():
+    global new_summary
+    try:
+        response = await get_summary_from_server()
+        if response != new_summary:
+            print(f"Got summary: {response}")
+            new_summary = response
+    except Exception as e:
+        print(f"Error: {e}")
+        pass
 if __name__ == '__main__':
     bot.run(TOKEN)
     

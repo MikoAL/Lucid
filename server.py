@@ -17,7 +17,8 @@ class Output(BaseModel):
     source: str | None = 'Lucid'
     timestamp: float | None = time.time()
     
-
+class Summary(BaseModel):
+    content: str
     
 app = FastAPI()
 
@@ -29,6 +30,7 @@ mailbox = []
 # timestamp
 # 
 new_message = Output(content='')
+new_summary = Summary(content='No summary available.')
 @app.get("/")
 async def root():
     return {'message':'Hello Mom!'}
@@ -65,4 +67,14 @@ async def display_output():
     _ = Output(content='')
     _, new_message = new_message, _
     return _
-    
+
+@app.post('/discord/post_summary')
+async def summary_from_server(summary: Summary):
+    global new_summary
+    logging.info(f'Discord: {summary.content}')
+    new_summary = summary
+    return
+@app.get('/discord/get_summary')
+async def get_summary():
+    global new_summary
+    return new_summary
