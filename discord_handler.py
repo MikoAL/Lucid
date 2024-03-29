@@ -73,7 +73,7 @@ async def on_message(message):
 @bot.command(name='summary')
 async def get_summary(ctx):
     global new_summary
-    await ctx.send(new_summary)
+    await ctx.send(f"```\nSummary:\n{new_summary}\n```")
 """
 For the bot to collect all the messages sent in a channel.
 
