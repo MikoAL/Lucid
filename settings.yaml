@@ -6,7 +6,7 @@ user_name: Miko
 # https://rentry.org/llm-settings
 # https://huggingface.co/docs/transformers/main_classes/configuration
 llm_settings:
-  language_model: macadeliccc/laser-dolphin-mixtral-4x7b-dpo-AWQ
+  language_model: solidrust/Hercules-4.0-Mistral-v0.2-7B-AWQ #Qwen/Qwen1.5-MoE-A2.7B-Chat-GPTQ-Int4 #macadeliccc/laser-dolphin-mixtral-4x7b-dpo-AWQ
   temperature : 0.8
   top_k: 50
   top_p: 1.0
