@@ -482,6 +482,7 @@ summaries = []
 summaries_cross_encoder_result = []
 
 # small_lm loop
+send_output(output={'content':"```\nLucid is ONLINE```",'source':'system','timestamp':time.time(),'type':'conversation'})
 while True:
 	# Check for new mail if it has been more than 0.5 seconds since last check
 	if time.time()-last_get_mail_time >= 0.5:
