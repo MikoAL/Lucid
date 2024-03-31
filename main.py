@@ -25,18 +25,23 @@ with open('settings.yaml', 'r') as file:
 host = settings['host']
 port = settings['port']
 server = f'http://{host}:{port}'
-language_model = settings['llm_settings']['language_model']
-conversation_temperature = settings['llm_settings']['temperature']
-top_k = settings['llm_settings']['top_k']
-top_p = settings['llm_settings']['top_p']
+small_lm_name = settings['small_lm_settings']['language_model']
+small_lm_temperature = settings['small_lm_settings']['temperature']
+small_lm_top_k = settings['small_lm_settings']['top_k']
+small_lm_top_p = settings['small_lm_settings']['top_p']
+
+oobabooga_api_host = settings['oobabooga_api']['host']
+oobabooga_api_port = settings['oobabooga_api']['port']
+main_lm_temperature = settings['main_lm_settings']['temperature']
+oobabooga_api_server = f'http://{oobabooga_api_host}:{oobabooga_api_port}'
 
 logging.info('\n'.join([f"\nHost: {host}",
 			  f"Port: {port}",
 			  f"Server: {server}",
-			  f"Language Model: {language_model}",
-			  f"Temperature: {conversation_temperature}",
-			  f"Top K: {top_k}",
-			  f"Top P: {top_p}",
+			  f"Small Language Model: {small_lm_name}",
+			  f"Temperature: {small_lm_temperature}",
+			  f"Top K: {small_lm_top_k}",
+			  f"Top P: {small_lm_top_p}",
 			  ]))
 
 # ============================ #
@@ -60,11 +65,36 @@ def send_output(output, server=server):
 
 def send_summary(summary, server=server):
 	requests.post(url=f"{server}/discord/post_summary",json=summary)
+ 
+ 
 # ============================ #
+# Oobabooga API stuff
+def api_generate_response(prompt: str,
+                          temperature: float = 0.7,
+                          max_tokens: int = 200,
+                          top_k: int = 20,
+                          top_p: float = 1.0,
+                          stop: list = ["\n"],):
+	json = {
+		"prompt": prompt,
+		"temperature": temperature,
+		"max_tokens": max_tokens,
+		"top_k": top_k,
+		"top_p": top_p,
+		"stop": stop,
+	}
+	return ((requests.post(url=f"{oobabooga_api_server}/v1/completions", json=json)).json())['choices'][0]['text']
 
-from guidance import models, gen, select
+ 
+# ============================ #
+"""
+Guidance stuff
+"""
+
+
+from guidance import models, select, gen
 import guidance
-clean_lm = models.Transformers(language_model, device_map="cuda", echo=False)
+small_lm = models.Transformers(small_lm_name, device_map="cuda", echo=False, trust_remote_code=True)
 
 prompt_path = r".\Prompts"
 
@@ -93,7 +123,7 @@ You are Lucid, a versatile AI created by Miko, for the purpose of helping him. Y
 While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
 You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
 
-Lucid_lm = clean_lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
+Lucid_small_lm = small_lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
 conversation=[]
@@ -114,8 +144,8 @@ def get_conversation(conversation=conversation, retrieval_amount=8):
 
 # a summary of all current event, to hopefully shorten the required conversation length
 summary = 'Not Available'
-@guidance(stateless=False)
-def write_summary(lm, conversation=conversation, previous_summary=summary):
+
+def write_summary(conversation=conversation, previous_summary=summary):
 	conversation_ = get_conversation(conversation=conversation)
 	new_line = '\n'
 	prompt = f"""\
@@ -144,12 +174,13 @@ CONVERSATION:
 {conversation_}
 
 SUMMARY:
-{gen(name='summary', max_tokens=200, temperature=conversation_temperature, top_p=top_p, stop=new_line)}"""
-	temp_lm = lm + prompt
-	return temp_lm
-def get_summary(clean_lm=clean_lm, conversation=conversation, previous_summary=summary):
-	temp_lm = clean_lm + write_summary(conversation=conversation, previous_summary=previous_summary)
-	return temp_lm['summary']
+"""
+	response = api_generate_response(prompt=prompt, temperature=main_lm_temperature, max_tokens=200, stop=["\n"])
+	return response
+#{gen(name='summary', max_tokens=200, temperature=small_lm_temperature, top_p=small_lm_top_p, stop=new_line)}
+def get_summary(conversation=conversation, previous_summary=summary):
+	response = write_summary(conversation=conversation, previous_summary=previous_summary)
+	return response
 # the main tasks, defaults to be a good assistant to Miko or something like that.
 tasks = []
 def get_tasks(tasks=tasks) -> str:
@@ -162,31 +193,31 @@ def get_tasks(tasks=tasks) -> str:
 		return prompt.strip()
 
 # This is for generating a response
-@guidance(stateless=False)
-def guidance_converse(lm, working_memory=working_memory):
-	new_line= "\n"
-	logging.debug(f"Conversation: {get_conversation()}")
-	prompt = f"""\
-[Tasks]
-{get_tasks()}
+# @guidance(stateless=False)
+# def guidance_converse(lm, working_memory=working_memory):
+# 	new_line= "\n"
+# 	logging.debug(f"Conversation: {get_conversation()}")
+# 	prompt = f"""\
+# [Tasks]
+# {get_tasks()}
 
-[Working Memory]
-{working_memory}
+# [Working Memory]
+# {working_memory}
 
-[Summary Of Previous Conversation]
-{summary}
+# [Summary Of Previous Conversation]
+# {summary}
 
-[Conversation]
-{get_conversation()}
+# [Conversation]
+# {get_conversation()}
 
-[Output]
-Lucid: {gen(name='response', stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
-	temp_lm = lm + prompt
-	#response = temp_lm['response']
-	return temp_lm
-def converse(Lucid_lm=Lucid_lm) -> str:
-	temp_lm = Lucid_lm + guidance_converse()
-	return temp_lm['response']
+# [Output]
+# Lucid: {gen(name='response', stop=new_line, temperature=small_lm_temperature, top_p=small_lm_top_p)}"""
+# 	temp_lm = lm + prompt
+# 	#response = temp_lm['response']
+# 	return temp_lm
+# def converse(Lucid_lm=Lucid_small_lm) -> str:
+# 	temp_lm = Lucid_lm + guidance_converse()
+# 	return temp_lm['response']
 
 # ============================ #
 # Chroma stuff
@@ -239,8 +270,8 @@ This is what a Info Block should look like from an example:
 ```json
 {first_curly}
   "object_type" : '{select(['entity','event'], name="object_type")},
-  "object_name" : "{gen(stop='"',name = "object_name", temperature=conversation_temperature,  top_p=top_p)},
-  "content" : "{gen(stop='"',name="content", temperature=conversation_temperature,  top_p=top_p)},"""  
+  "object_name" : "{gen(stop='"',name = "object_name", temperature=small_lm_temperature,  top_p=small_lm_top_p)},
+  "content" : "{gen(stop='"',name="content", temperature=small_lm_temperature,  top_p=small_lm_top_p)},"""  
 	return lm
 
 def make_new_info_block(clean_lm, passage):
@@ -274,7 +305,7 @@ Answer: "The play 'Romeo and Juliet' was written by William Shakespeare."
 [End of Example]
 
 Question: "{query}"
-Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
+Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=small_lm_temperature, top_p=small_lm_top_p)}"""
 	lm += prompt
 	return lm
 def generate_fake_answer(clean_lm, query) -> str:
@@ -324,21 +355,58 @@ Yes.
 Is there any new information that I should know about?
 """
 	temp_lm += select(['Yes','No'], name="Yes_or_No")
-	if (temp_lm['Yes_or_No']) == 'No':
-		return temp_lm
-	else:
-		temp_lm += f"""\
-\n - {gen(name='new_info',max_tokens=200, stop=new_line, temperature=conversation_temperature, top_p=top_p)}"""
-		return temp_lm
+	return temp_lm
 
-def check_for_new_info(clean_lm = clean_lm, conversation = conversation, working_memory = working_memory) -> str:
+def check_for_new_info(clean_lm = small_lm, conversation = conversation, working_memory = working_memory) -> bool:
 	temp_lm = clean_lm+guidance_check_for_new_info(conversation=conversation, working_memory=working_memory)
 	if temp_lm['Yes_or_No'] == 'No':
-		return "No new information."
+		return False
 	else:
-		return temp_lm['new_info']
+		return True
+def get_new_info(conversation = conversation, working_memory = working_memory):
+	working_memory_prompt = ""
+	if len(working_memory) == 0:
+		working_memory_prompt = 'No Record Yet.'
+	else:
+		prompt = ''
+		if len(working_memory) != 0:
+			for i in working_memory:
+				prompt+=f'- {i["content"]}\n'
+			working_memory_prompt = prompt.strip()
+	prompt = f"""\
+[System]
+You are a helpful assistant. You specialize in checking if there is any new information in the conversation that is not in working memory.
 
+[Example]
 
+[Example Working Memory]
+- Person 1 is going to the store.
+
+[Example Conversation]
+[2023/06/23] Person1: I'm going to the store.
+[2023/06/23] Person2: What are you going to buy?
+[2023/06/23] Person1: I'm going to buy some apples and oranges.
+[2023/06/23] Person2: I heard that the store has a sale on bananas today.
+
+[Example Checking for New Information]
+Is there any new information that I should know about?
+Yes.
+- There is a sale on bananas at the store in 2023/06/23 according to Person2.
+
+[End of Example]
+
+[Working Memory]
+{working_memory_prompt}
+
+[Conversation]
+{get_conversation(conversation=conversation)}
+
+[Output]
+Is there any new information that I should know about?
+Yes.
+- """
+	response = api_generate_response(prompt=prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\n"])
+	return response
 def get_working_memory(working_memory=working_memory) -> str:
 	if len(working_memory) == 0:
 		return 'No Record Yet.'
@@ -379,11 +447,101 @@ def play_audio(text):
 	stream.play_async()
 # Temp TTS stuff end
 # ============================ #
+# Main LM
+
+# Load model directly
+#from transformers import AutoTokenizer, AutoModelForCausalLM
+
+#main_lm_tokenizer = AutoTokenizer.from_pretrained("Ichigo2899/MixTAO-7Bx2-MoE-v8.1-AWQ")
+#main_lm_model = AutoModelForCausalLM.from_pretrained("Ichigo2899/MixTAO-7Bx2-MoE-v8.1-AWQ")
+
+def main_lm_converse() -> str:
+	prompt = f"""\
+[Tasks]
+{get_tasks()}
+
+[Working Memory]
+{working_memory}
+
+[Summary Of Previous Conversation]
+{summary}
+
+[Conversation]
+{get_conversation()}
+
+[Output]
+Lucid: """
+	response = api_generate_response(prompt=prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\n"])
+	return response
+
+# ============================ #
 last_get_mail_time= 0
 new_mail = []
 times_without_summary = 0
 summaries = []
 summaries_cross_encoder_result = []
+
+# small_lm loop
+while True:
+	# Check for new mail if it has been more than 0.5 seconds since last check
+	if time.time()-last_get_mail_time >= 0.5:
+		last_get_mail_time = time.time()
+		new_mail.extend(get_mail())
+
+	if len(new_mail) != 0:
+		# Mail sorting based on types, starting from the oldest (the front)
+		for i in range(len(new_mail)):
+			mail_ = new_mail.pop(0)
+			#print(mail_)
+			match mail_['type']:
+				case 'conversation':
+					conversation.append(mail_)
+					logging.debug(f'Got mail: {mail_}')
+				case _:
+					tmp_mail_type = mail_['type']
+					logging.WARNING(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
+					pass
+
+		# generate response
+		logging.debug('generating response')
+		generated_response=main_lm_converse()
+		response = {
+	  			'source' : 'Lucid', 
+				'content' : generated_response,
+				'timestamp' : time.time(),
+				'type' : 'conversation',
+				}
+		logging.debug(f"generated response:\n{generated_response}")
+		conversation.append(response)
+		send_output(output=response)
+		#play_audio(response['content'])
+		
+		# Check for new info
+		new_info_check = check_for_new_info()
+		if new_info_check == False:
+			logging.debug("No new information.")
+		else:
+			new_info = get_new_info()
+			new_info_block = make_new_info_block(clean_lm=small_lm,passage=(get_conversation()+"\n\n"+new_info))
+			accepted = push_info_block_to_short_term_memory(new_info_block)
+			if accepted:
+				working_memory.append(new_info_block)
+		# Check how many times it has been since the last summary
+		if times_without_summary < 0:
+			times_without_summary += 1
+		else:
+			summary = get_summary()
+			logging.debug(f"Generated summary:\n{summary}")
+			send_summary({'content':summary})
+			times_without_summary = 0
+			# Graph the summary or something
+			summaries.append(summary)
+			# If the cosine similarity between the last two summaries is less than a threshold, then we should maybe create a new info block
+			# Or if the cosine similarity between the second last summary and the newest few dialog is less than a threshold, then we should maybe create a new info block
+			if len(summaries) >= 2:
+				#summaries_cross_encoder_result.append(cross_encoder([summaries[-2], summaries[-1]]))
+				pass
+"""
 while True:
 
 	
@@ -410,7 +568,7 @@ while True:
 		logging.debug('generating response')
 		generated_response=converse()
 		response = {
-	  			'source' : 'Lucid',
+	  			'source' : 'Lucid', 
 				'content' : generated_response,
 				'timestamp' : time.time(),
 				'type' : 'conversation',
@@ -445,7 +603,7 @@ while True:
 			if len(summaries) >= 2:
 				#summaries_cross_encoder_result.append(cross_encoder([summaries[-2], summaries[-1]]))
 				pass
-			
+			"""
 		
 		
 

@@ -2,12 +2,27 @@ host: 127.0.0.1
 port: 8001
 user_name: Miko
 
+oobabooga_api:
+  host: 127.0.0.1
+  port: 5000
+
 
 # https://rentry.org/llm-settings
 # https://huggingface.co/docs/transformers/main_classes/configuration
-llm_settings:
-  language_model: solidrust/Hercules-4.0-Mistral-v0.2-7B-AWQ #Qwen/Qwen1.5-MoE-A2.7B-Chat-GPTQ-Int4 #macadeliccc/laser-dolphin-mixtral-4x7b-dpo-AWQ
+
+
+# Small LLM is using guidance
+small_lm_settings:
+  language_model: TheBloke/phi-2-GPTQ #solidrust/Hercules-4.0-Mistral-v0.2-7B-AWQ #Qwen/Qwen1.5-MoE-A2.7B-Chat-GPTQ-Int4 #macadeliccc/laser-dolphin-mixtral-4x7b-dpo-AWQ
   temperature : 0.8
-  top_k: 50
+  top_k: 3
+  top_p: 1.0
+  repetition_penalty: 1.2
+
+# Normal LLM is using transformers 
+main_lm_settings:
+  language_model: Ichigo2899/MixTAO-7Bx2-MoE-v8.1-AWQ #solidrust/Hercules-4.0-Mistral-v0.2-7B-AWQ #Qwen/Qwen1.5-MoE-A2.7B-Chat-GPTQ-Int4 #macadeliccc/laser-dolphin-mixtral-4x7b-dpo-AWQ
+  temperature : 0.8
+  top_k: 3
   top_p: 1.0
   repetition_penalty: 1.2
