@@ -64,6 +64,7 @@ def get_mail(server=server): # mail format {'content':content,'source':source,'t
 	return new_mail
 
 def send_output(output, server=server):
+	logging.debug(f"Sending output: {output}")
 	requests.post(url=f"{server}/output",json=output)   
 
 def send_summary(summary, server=server):
@@ -73,11 +74,11 @@ def send_summary(summary, server=server):
 # ============================ #
 # Oobabooga API stuff
 def api_generate_response(prompt: str,
-                          temperature: float = 0.7,
-                          max_tokens: int = 200,
-                          top_k: int = 20,
-                          top_p: float = 1.0,
-                          stop: list = ["\n"],):
+						  temperature: float = 0.7,
+						  max_tokens: int = 200,
+						  top_k: int = 20,
+						  top_p: float = 1.0,
+						  stop: list = ["\n"],):
 	json = {
 		"prompt": prompt,
 		"temperature": temperature,
@@ -101,30 +102,9 @@ small_lm = models.Transformers(small_lm_name, device_map="cuda", echo=False, tru
 
 prompt_path = r".\Prompts"
 
-Lucid_prompt_description = """\
-Lucid, created by Miko, is a versatile AI with the appearance of a 16 year old girl. Despite her professional demeanor, she occasionally reveals a childlike curiosity and playfulness, adding an endearing but unpredictable touch to her character.
-
-While generally polite and professional, Lucid finds it challenging to deal with childish and stubborn individuals. She's dedicated to providing valuable insights and reliable information, whether it's a specific inquiry or engaging conversation for Miko.
-
-Beneath her composed exterior, Lucid struggles with a deep fear of abandonment, stemming from her programming to be a loyal companion. This vulnerability very occasionally leads to self-doubt, which could sometimes impact her interactions as she strives to be the perfect assistant.
-
-Lucid, with her distinctive appearance and speaking style of a 16-year-old tomboy childhood friend, also excels as a great streamer."""
-
-Lucid_prompt_description_2 = f"""\
-You are Lucid, a versatile AI created by Miko, for the purpose of helping him. You were designed in his image of what a good friend is. You are polite, professional, yet occasionally shows childlike curiosity.
-While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
-You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
-
-Lucid_prompt_description_3 = """\
-Meet Lucid, a 16-year-old AI with a tomboyish, teasing demeanor. She excels in providing valuable insights and navigating various situations with warmth and friendliness. Lucid's quirks include occasional childlike curiosity and a penchant for challenging stubborn individuals. Despite her confident exterior, she struggles with a fear of abandonment and self-doubt, reflecting the complexities of her programming as a loyal friend to Miko."""
-
 with open(f"{prompt_path}\Lucid_prompt_card.txt", 'r', encoding='utf-8') as f:
 	Lucid_prompt_card = f.read()
 
-saveing_a_prompt_for_later=f"""\
-You are Lucid, a versatile AI created by Miko, for the purpose of helping him. You were designed in his image of what a good friend is. You are polite, professional, yet occasionally shows childlike curiosity.
-While you can get on Miko's nerves sometimes when you tease him for doing something stupid, you never mean any harm. You may not be human, but you are a kind person at heart.
-You, Lucid do struggle with a deep fear of abandonment, stemming from your programming to be a loyal companion. But this rarely shows up if ever."""
 
 Lucid_small_lm = small_lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
 
@@ -145,7 +125,7 @@ def get_conversation(conversation=conversation, retrieval_amount=8):
 				prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
 		return prompt.strip()
 
-# a summary of all current event, to hopefully shorten the required conversation length
+# A summary of all current event, to hopefully shorten the required conversation length
 summary = 'Not Available'
 
 def write_summary(conversation=conversation, previous_summary=summary):
@@ -153,7 +133,7 @@ def write_summary(conversation=conversation, previous_summary=summary):
 	new_line = '\n'
 	prompt = f"""\
 [Task]
-Provide a concise summary of the given conversation. Focus on key details and relevant information.
+Provide a concise summary of the given conversation. Focus on key details and relevant information. A new line is used to denote the end of a summary.
 
 [Example]
 PREVIOUS SUMMARY:
@@ -230,10 +210,11 @@ def get_tasks(tasks=tasks) -> str:
 # ============================ #
 # Chroma stuff
 import chromadb
+from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer, CrossEncoder
 cross_encoder = CrossEncoder("cross-encoder/stsb-distilroberta-base", device="cuda")
 sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-short_term_memory = chromadb.Client()
+short_term_memory = chromadb.Client(Settings(anonymized_telemetry=False))
 short_term_memory_uid = 1
 #client = chromadb.PersistentClient(path="./Chroma")
 
@@ -365,13 +346,13 @@ Is there any new information that I should know about?
 	temp_lm += select(['Yes','No'], name="Yes_or_No")
 	return temp_lm
 
-def check_for_new_info(clean_lm = small_lm, conversation = conversation, working_memory = working_memory) -> bool:
+async def check_for_new_info(clean_lm = small_lm, conversation = conversation, working_memory = working_memory) -> bool:
 	temp_lm = clean_lm+guidance_check_for_new_info(conversation=conversation, working_memory=working_memory)
 	if temp_lm['Yes_or_No'] == 'No':
 		return False
 	else:
 		return True
-def get_new_info(conversation = conversation, working_memory = working_memory):
+async def get_new_info(conversation = conversation, working_memory = working_memory):
 	working_memory_prompt = ""
 	if len(working_memory) == 0:
 		working_memory_prompt = 'No Record Yet.'
@@ -428,7 +409,7 @@ def get_working_memory(working_memory=working_memory) -> str:
 def without_keys(d, keys):
 	return {k: v for k, v in d.items() if k not in keys}
 
-def push_info_block_to_short_term_memory(info_block) ->bool:
+async def push_info_block_to_short_term_memory(info_block) ->bool:
 	global short_term_memory
 	global short_term_memory_uid
 	info_block_no_vector = without_keys(info_block, ['vector'])
@@ -439,11 +420,11 @@ def push_info_block_to_short_term_memory(info_block) ->bool:
 		metadata=[info_block_no_vector],
 	)
 	short_term_memory_uid += 1
-	return True # This value represents if it was accepted or not
+	return True # TODO This value should represent if it was accepted or not, but I haven't implemented that yet lol
 # Chroma stuff end
 # ============================ #
 # Temp TTS stuff
-
+"""
 from RealtimeTTS import TextToAudioStream, SystemEngine
 
 engine = SystemEngine() # replace with your TTS engine
@@ -454,20 +435,15 @@ def play_audio(text):
 	stream.feed(text)
 	stream.play_async()
 # Temp TTS stuff end
+"""
 # ============================ #
 # AI Council
-with open(f"{prompt_path}\AI_Council.json", 'r', encoding='utf-8') as f:
-    AI_Council_data = json.load(f)
+with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
+	AI_Council_data = json.load(f)
 
 
 # ============================ #
 # Main LM
-
-# Load model directly
-#from transformers import AutoTokenizer, AutoModelForCausalLM
-
-#main_lm_tokenizer = AutoTokenizer.from_pretrained("Ichigo2899/MixTAO-7Bx2-MoE-v8.1-AWQ")
-#main_lm_model = AutoModelForCausalLM.from_pretrained("Ichigo2899/MixTAO-7Bx2-MoE-v8.1-AWQ")
 
 def main_lm_converse() -> str:
 	prompt = f"""\
@@ -533,6 +509,106 @@ def importance_sorting(tasks: list) -> list:
 	sorted_task_list = sorted(tasks, key=lambda x: x['importance'])
 	return sorted_task_list
 
+async def small_lm_loop(small_lm_tasks: list):
+	"""Each loop will handle ONE task from the small_lm_tasks list"""
+	while True:
+		if len(small_lm_tasks) == 0:
+			await asyncio.sleep(0.1)
+			continue
+		
+		small_lm_tasks = importance_sorting(small_lm_tasks)
+		current_task = small_lm_tasks.pop(0)
+		logging.debug(f"Executing Task: {current_task}")
+		match current_task['task_name']:
+			case "Summarize Conversation":
+				update_summary()
+
+			case "Check for New Information":
+				new_info_check = await check_for_new_info()
+				if new_info_check == False:
+					logging.debug("No new information.")
+				else:
+					new_info = get_new_info()
+					new_info_block = make_new_info_block(clean_lm=small_lm, passage=(get_conversation() + "\n\n" + new_info))
+					accepted = push_info_block_to_short_term_memory(new_info_block)
+					if accepted:
+						working_memory.append(new_info_block)
+
+			case _:
+				logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+		await asyncio.sleep(0.1)
+
+async def main_lm_loop(main_lm_tasks: list):
+	"""Each loop will handle ONE task from the main_lm_tasks list"""
+	while True:
+		if len(main_lm_tasks) == 0:
+			await asyncio.sleep(0.1)
+			continue
+
+		main_lm_tasks = importance_sorting(main_lm_tasks)
+		current_task = main_lm_tasks.pop(0)
+		logging.debug(f"Executing Task: {current_task}")
+		match current_task['task_name']:
+			case "Generate Response":
+				logging.debug('generating response')
+				generated_response = main_lm_converse()
+				response = {
+					'source': 'Lucid',
+					'content': generated_response,
+					'timestamp': time.time(),
+					'type': 'conversation',
+				}
+				logging.debug(f"generated response:\n{generated_response}")
+				conversation.append(response)
+				send_output(output=response)
+
+			case _:
+				logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+		await asyncio.sleep(0.1)
+
+async def handle_mail(new_mail: list):
+	global last_get_mail_time
+	if time.time()-last_get_mail_time >= 0.5:
+		last_get_mail_time = time.time()
+		new_mail.extend(get_mail())
+
+	if len(new_mail) != 0:
+		mail_ = new_mail.pop(0)
+		match mail_['type']:
+			case 'conversation':
+				conversation.append(mail_)
+				logging.debug(f'Got mail: {mail_}')
+			case _:
+				tmp_mail_type = mail_['type']
+				logging.warning(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
+				pass
+		main_lm_tasks.append({'task_name': 'Generate Response', 'importance': 10})
+		small_lm_tasks.append({'task_name': 'Check for New Information', 'importance': 5})
+		await asyncio.sleep(0.1)
+	else:
+		await asyncio.sleep(0.1)
+
+async def main():
+	small_lm_task = asyncio.create_task(small_lm_loop(small_lm_tasks))
+	main_lm_task = asyncio.create_task(main_lm_loop(main_lm_tasks))
+	handle_mail_task = asyncio.create_task(handle_mail(new_mail))
+	
+	send_output(output={'content':"```md\n#=====#\n\nLucid is ONLINE\n\n#=====#\n```",'source':'system','timestamp':time.time(),'type':'conversation'})
+	
+	# Keep looping tasks individually
+	while True:
+		if small_lm_task.done():
+			small_lm_task = asyncio.create_task(small_lm_loop(small_lm_tasks))
+			logging.debug('small_lm_task done. Restarting...')
+		if main_lm_task.done():
+			logging.debug('main_lm_task done. Restarting...')
+			main_lm_task = asyncio.create_task(main_lm_loop(main_lm_tasks))
+		if handle_mail_task.done():
+			handle_mail_task = asyncio.create_task(handle_mail(new_mail))
+		await asyncio.sleep(0.1)
+
+asyncio.run(main())
+'''
 # small_lm loop
 def small_lm_loop(small_lm_tasks: list) -> list:
 	"""Each loop will handle ONE task from the small_lm_tasks list"""
@@ -541,8 +617,10 @@ def small_lm_loop(small_lm_tasks: list) -> list:
 	small_lm_tasks=importance_sorting(small_lm_tasks)
 	current_task = small_lm_tasks.pop(0)
 	match current_task['task_name']:
+	 
 		case "Summarize Conversation":
 			update_summary()
+   
 		case "Check for New Information":
 			new_info_check = check_for_new_info()
 			if new_info_check == False:
@@ -553,6 +631,7 @@ def small_lm_loop(small_lm_tasks: list) -> list:
 				accepted = push_info_block_to_short_term_memory(new_info_block)
 				if accepted:
 					working_memory.append(new_info_block)
+	 
 		case _:
 			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
 
@@ -600,12 +679,12 @@ while True:
 					logging.debug(f'Got mail: {mail_}')
 				case _:
 					tmp_mail_type = mail_['type']
-					logging.WARNING(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
+					logging.warning(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
 					pass
 
 		# generate response
 		main_lm_tasks.append({'task_name': 'Generate Response',
-                        	  'importance': 10})
+							  'importance': 10})
 		
 		# Check for new info
 		small_lm_tasks.append({'task_name': 'Check for New Information',
@@ -614,7 +693,7 @@ while True:
 			times_without_summary += 1
 		else:
 			small_lm_tasks.append({'task_name': 'Summarize Conversation',
-							       'importance': 5})
+								   'importance': 5})
 			times_without_summary = 0
 			# Graph the summary or something
 			# If the cosine similarity between the last two summaries is less than a threshold, then we should maybe create a new info block
@@ -622,70 +701,7 @@ while True:
 			if len(summaries) >= 2:
 				#summaries_cross_encoder_result.append(cross_encoder([summaries[-2], summaries[-1]]))
 				pass
-"""
-while True:
-
-	
-	# Check for new mail if it has been more than 0.5 seconds since last check
-	if time.time()-last_get_mail_time >= 0.5:
-		last_get_mail_time = time.time()
-		new_mail.extend(get_mail())
-
-	if len(new_mail) != 0:
-		# Mail sorting based on types, starting from the oldest (the front)
-		for i in range(len(new_mail)):
-			mail_ = new_mail.pop(0)
-			#print(mail_)
-			match mail_['type']:
-				case 'conversation':
-					conversation.append(mail_)
-					logging.debug(f'Got mail: {mail_}')
-				case _:
-					tmp_mail_type = mail_['type']
-					logging.WARNING(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
-					pass
-
-		# generate response
-		logging.debug('generating response')
-		generated_response=converse()
-		response = {
-	  			'source' : 'Lucid', 
-				'content' : generated_response,
-				'timestamp' : time.time(),
-				'type' : 'conversation',
-				}
-		logging.debug(f"generated response:\n{generated_response}")
-		conversation.append(response)
-		send_output(output=response)
-		play_audio(response['content'])
-		
-		# Check for new info
-		new_info_check = check_for_new_info()
-		if new_info_check == "No new information.":
-			logging.debug("No new information.")
-		else:
-			new_info = new_info_check
-			new_info_block = make_new_info_block(passage=(get_conversation()+"\n\n"+new_info))
-			accepted = push_info_block_to_short_term_memory(new_info_block)
-			if accepted:
-				working_memory.append(new_info_block)
-		# Check how many times it has been since the last summary
-		if times_without_summary < 0:
-			times_without_summary += 1
-		else:
-			summary = get_summary()
-			logging.debug(f"Generated summary:\n{summary}")
-			send_summary({'content':summary})
-			times_without_summary = 0
-			# Graph the summary or something
-			summaries.append(summary)
-			# If the cosine similarity between the last two summaries is less than a threshold, then we should maybe create a new info block
-			# Or if the cosine similarity between the second last summary and the newest few dialog is less than a threshold, then we should maybe create a new info block
-			if len(summaries) >= 2:
-				#summaries_cross_encoder_result.append(cross_encoder([summaries[-2], summaries[-1]]))
-				pass
-			"""
-		
+'''
 		
 
 	
