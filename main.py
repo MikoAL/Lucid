@@ -5,6 +5,9 @@ import yaml
 import os
 import logging
 from datetime import date
+import asyncio
+import json
+
 import numpy as np
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p')
@@ -178,9 +181,14 @@ SUMMARY:
 	response = api_generate_response(prompt=prompt, temperature=main_lm_temperature, max_tokens=200, stop=["\n"])
 	return response
 #{gen(name='summary', max_tokens=200, temperature=small_lm_temperature, top_p=small_lm_top_p, stop=new_line)}
-def get_summary(conversation=conversation, previous_summary=summary):
-	response = write_summary(conversation=conversation, previous_summary=previous_summary)
-	return response
+def update_summary() -> None:
+	global summary
+	global summaries
+	summary = write_summary(conversation=conversation, previous_summary=summary)
+	summaries.append(summary)
+	logging.debug(f"Generated summary:\n{summary}")
+	send_summary({'content':summary})
+
 # the main tasks, defaults to be a good assistant to Miko or something like that.
 tasks = []
 def get_tasks(tasks=tasks) -> str:
@@ -447,6 +455,12 @@ def play_audio(text):
 	stream.play_async()
 # Temp TTS stuff end
 # ============================ #
+# AI Council
+with open(f"{prompt_path}\AI_Council.json", 'r', encoding='utf-8') as f:
+    AI_Council_data = json.load(f)
+
+
+# ============================ #
 # Main LM
 
 # Load model directly
@@ -481,8 +495,94 @@ times_without_summary = 0
 summaries = []
 summaries_cross_encoder_result = []
 
+small_lm_tasks = []
+main_lm_tasks = []
+"""
+A task structure so we can split work more easily
+
+small_lm will handle the following tasks:
+- Summarize the conversation
+- Generate a fake answer
+- Check for new information
+- Generate a new information block
+
+main_lm will handle the following tasks:
+- Generate a response
+- Thinking
+
+task_names
+- Summarize Conversation
+- Generate Fake Answer
+- Check for New Information
+- Generate New Information Block
+- Generate Response
+
+importance
+Goes from 0 to inf, 0 being the least important and inf being the most important
+
+{
+	"task_name": "Summarize Conversation",
+	"importance": 1,
+}
+
+"""
+def importance_sorting(tasks: list) -> list:
+	"""
+	Sorting the tasks based on importance
+	"""
+	sorted_task_list = sorted(tasks, key=lambda x: x['importance'])
+	return sorted_task_list
+
 # small_lm loop
-send_output(output={'content':"```\nLucid is ONLINE```",'source':'system','timestamp':time.time(),'type':'conversation'})
+def small_lm_loop(small_lm_tasks: list) -> list:
+	"""Each loop will handle ONE task from the small_lm_tasks list"""
+	if len(small_lm_tasks) == 0:
+		return
+	small_lm_tasks=importance_sorting(small_lm_tasks)
+	current_task = small_lm_tasks.pop(0)
+	match current_task['task_name']:
+		case "Summarize Conversation":
+			update_summary()
+		case "Check for New Information":
+			new_info_check = check_for_new_info()
+			if new_info_check == False:
+				logging.debug("No new information.")
+			else:
+				new_info = get_new_info()
+				new_info_block = make_new_info_block(clean_lm=small_lm,passage=(get_conversation()+"\n\n"+new_info))
+				accepted = push_info_block_to_short_term_memory(new_info_block)
+				if accepted:
+					working_memory.append(new_info_block)
+		case _:
+			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+
+	return small_lm_tasks
+
+def main_lm_loop(main_lm_tasks: list) -> list:
+	"""Each loop will handle ONE task from the main_lm_tasks list"""
+	if len(main_lm_tasks) == 0:
+		return
+	main_lm_tasks=importance_sorting(main_lm_tasks)
+	current_task = main_lm_tasks.pop(0)
+	match current_task['task_name']:
+		case "Generate Response":
+			logging.debug('generating response')
+			generated_response=main_lm_converse()
+			response = {
+					'source' : 'Lucid', 
+					'content' : generated_response,
+					'timestamp' : time.time(),
+					'type' : 'conversation',
+					}
+			logging.debug(f"generated response:\n{generated_response}")
+			conversation.append(response)
+			send_output(output=response)
+		case _:
+			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+
+	return main_lm_tasks
+
+send_output(output={'content':"```md\n#=====#\n\nLucid is ONLINE\n\n#=====#\n```",'source':'system','timestamp':time.time(),'type':'conversation'})
 while True:
 	# Check for new mail if it has been more than 0.5 seconds since last check
 	if time.time()-last_get_mail_time >= 0.5:
@@ -504,39 +604,19 @@ while True:
 					pass
 
 		# generate response
-		logging.debug('generating response')
-		generated_response=main_lm_converse()
-		response = {
-	  			'source' : 'Lucid', 
-				'content' : generated_response,
-				'timestamp' : time.time(),
-				'type' : 'conversation',
-				}
-		logging.debug(f"generated response:\n{generated_response}")
-		conversation.append(response)
-		send_output(output=response)
-		#play_audio(response['content'])
+		main_lm_tasks.append({'task_name': 'Generate Response',
+                        	  'importance': 10})
 		
 		# Check for new info
-		new_info_check = check_for_new_info()
-		if new_info_check == False:
-			logging.debug("No new information.")
-		else:
-			new_info = get_new_info()
-			new_info_block = make_new_info_block(clean_lm=small_lm,passage=(get_conversation()+"\n\n"+new_info))
-			accepted = push_info_block_to_short_term_memory(new_info_block)
-			if accepted:
-				working_memory.append(new_info_block)
-		# Check how many times it has been since the last summary
+		small_lm_tasks.append({'task_name': 'Check for New Information',
+							'importance': 5})
 		if times_without_summary < 0:
 			times_without_summary += 1
 		else:
-			summary = get_summary()
-			logging.debug(f"Generated summary:\n{summary}")
-			send_summary({'content':summary})
+			small_lm_tasks.append({'task_name': 'Summarize Conversation',
+							       'importance': 5})
 			times_without_summary = 0
 			# Graph the summary or something
-			summaries.append(summary)
 			# If the cosine similarity between the last two summaries is less than a threshold, then we should maybe create a new info block
 			# Or if the cosine similarity between the second last summary and the newest few dialog is less than a threshold, then we should maybe create a new info block
 			if len(summaries) >= 2:

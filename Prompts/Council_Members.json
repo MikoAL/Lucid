@@ -1,0 +1,8 @@
+[{
+    "name": "TempName1",
+    "personality_prompt": "Temp Description 1"
+},
+{
+    "name": "TempName2",
+    "personality_prompt": "Temp Description 2"
+}]
