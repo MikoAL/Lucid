@@ -446,12 +446,13 @@ with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
 # Main LM
 
 def main_lm_converse() -> str:
+	global summary
 	prompt = f"""\
 [Tasks]
 {get_tasks()}
 
 [Working Memory]
-{working_memory}
+{get_working_memory()}
 
 [Summary Of Previous Conversation]
 {summary}
@@ -509,70 +510,72 @@ def importance_sorting(tasks: list) -> list:
 	sorted_task_list = sorted(tasks, key=lambda x: x['importance'])
 	return sorted_task_list
 
-async def small_lm_loop(small_lm_tasks: list):
+async def small_lm_loop() -> None:
 	"""Each loop will handle ONE task from the small_lm_tasks list"""
-	while True:
-		if len(small_lm_tasks) == 0:
-			await asyncio.sleep(0.1)
-			continue
-		
-		small_lm_tasks = importance_sorting(small_lm_tasks)
-		current_task = small_lm_tasks.pop(0)
-		logging.debug(f"Executing Task: {current_task}")
-		match current_task['task_name']:
-			case "Summarize Conversation":
-				update_summary()
-
-			case "Check for New Information":
-				new_info_check = await check_for_new_info()
-				if new_info_check == False:
-					logging.debug("No new information.")
-				else:
-					new_info = get_new_info()
-					new_info_block = make_new_info_block(clean_lm=small_lm, passage=(get_conversation() + "\n\n" + new_info))
-					accepted = push_info_block_to_short_term_memory(new_info_block)
-					if accepted:
-						working_memory.append(new_info_block)
-
-			case _:
-				logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+	global small_lm_tasks
+	if len(small_lm_tasks) == 0:
 		await asyncio.sleep(0.1)
+		return
+	
+	small_lm_tasks = importance_sorting(small_lm_tasks)
+	current_task = small_lm_tasks.pop(0)
+	logging.debug(f"Executing Task: {current_task}")
+	match current_task['task_name']:
+		case "Summarize Conversation":
+			update_summary()
 
-async def main_lm_loop(main_lm_tasks: list):
+		case "Check for New Information":
+			new_info_check = await check_for_new_info()
+			if new_info_check == False:
+				logging.debug("No new information.")
+			else:
+				new_info = await get_new_info()
+				new_info_block = make_new_info_block(clean_lm=small_lm, passage=(get_conversation() + "\n\n" + new_info))
+				accepted = push_info_block_to_short_term_memory(new_info_block)
+				if accepted:
+					working_memory.append(new_info_block)
+
+		case _:
+			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+	return
+
+async def main_lm_loop() -> None:
 	"""Each loop will handle ONE task from the main_lm_tasks list"""
-	while True:
-		if len(main_lm_tasks) == 0:
-			await asyncio.sleep(0.1)
-			continue
-
-		main_lm_tasks = importance_sorting(main_lm_tasks)
-		current_task = main_lm_tasks.pop(0)
-		logging.debug(f"Executing Task: {current_task}")
-		match current_task['task_name']:
-			case "Generate Response":
-				logging.debug('generating response')
-				generated_response = main_lm_converse()
-				response = {
-					'source': 'Lucid',
-					'content': generated_response,
-					'timestamp': time.time(),
-					'type': 'conversation',
-				}
-				logging.debug(f"generated response:\n{generated_response}")
-				conversation.append(response)
-				send_output(output=response)
-
-			case _:
-				logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+	global main_lm_tasks
+	if len(main_lm_tasks) == 0:
 		await asyncio.sleep(0.1)
+		return
 
-async def handle_mail(new_mail: list):
+	main_lm_tasks = importance_sorting(main_lm_tasks)
+	current_task = main_lm_tasks.pop(0)
+	logging.debug(f"Executing Task: {current_task}")
+	match current_task['task_name']:
+		case "Generate Response":
+			logging.debug('generating response')
+			generated_response = main_lm_converse()
+			response = {
+				'source': 'Lucid',
+				'content': generated_response,
+				'timestamp': time.time(),
+				'type': 'conversation',
+			}
+			logging.debug(f"generated response:\n{generated_response}")
+			conversation.append(response)
+			send_output(output=response)
+
+		case _:
+			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
+	return
+
+async def handle_mail() -> None:
+	global new_mail, small_lm_tasks, main_lm_tasks
 	global last_get_mail_time
 	if time.time()-last_get_mail_time >= 0.5:
 		last_get_mail_time = time.time()
 		new_mail.extend(get_mail())
 
 	if len(new_mail) != 0:
+		logging.debug(f"New mail: {new_mail}")
 		mail_ = new_mail.pop(0)
 		match mail_['type']:
 			case 'conversation':
@@ -582,126 +585,34 @@ async def handle_mail(new_mail: list):
 				tmp_mail_type = mail_['type']
 				logging.warning(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
 				pass
+
 		main_lm_tasks.append({'task_name': 'Generate Response', 'importance': 10})
+		logging.debug('Added Generate Response task to main_lm_tasks')
 		small_lm_tasks.append({'task_name': 'Check for New Information', 'importance': 5})
+		logging.debug('Added Check for New Information task to small_lm_tasks')
 		await asyncio.sleep(0.1)
 	else:
 		await asyncio.sleep(0.1)
+	return
 
-async def main():
-	small_lm_task = asyncio.create_task(small_lm_loop(small_lm_tasks))
-	main_lm_task = asyncio.create_task(main_lm_loop(main_lm_tasks))
-	handle_mail_task = asyncio.create_task(handle_mail(new_mail))
+async def main() -> None:
+	small_lm_task = asyncio.create_task(small_lm_loop())
+	main_lm_task = asyncio.create_task(main_lm_loop())
+	handle_mail_task = asyncio.create_task(handle_mail())
 	
 	send_output(output={'content':"```md\n#=====#\n\nLucid is ONLINE\n\n#=====#\n```",'source':'system','timestamp':time.time(),'type':'conversation'})
 	
 	# Keep looping tasks individually
 	while True:
 		if small_lm_task.done():
-			small_lm_task = asyncio.create_task(small_lm_loop(small_lm_tasks))
+			small_lm_task = asyncio.create_task(small_lm_loop())
 			logging.debug('small_lm_task done. Restarting...')
 		if main_lm_task.done():
 			logging.debug('main_lm_task done. Restarting...')
-			main_lm_task = asyncio.create_task(main_lm_loop(main_lm_tasks))
+			main_lm_task = asyncio.create_task(main_lm_loop())
 		if handle_mail_task.done():
-			handle_mail_task = asyncio.create_task(handle_mail(new_mail))
+			handle_mail_task = asyncio.create_task(handle_mail())
 		await asyncio.sleep(0.1)
 
 asyncio.run(main())
-'''
-# small_lm loop
-def small_lm_loop(small_lm_tasks: list) -> list:
-	"""Each loop will handle ONE task from the small_lm_tasks list"""
-	if len(small_lm_tasks) == 0:
-		return
-	small_lm_tasks=importance_sorting(small_lm_tasks)
-	current_task = small_lm_tasks.pop(0)
-	match current_task['task_name']:
-	 
-		case "Summarize Conversation":
-			update_summary()
-   
-		case "Check for New Information":
-			new_info_check = check_for_new_info()
-			if new_info_check == False:
-				logging.debug("No new information.")
-			else:
-				new_info = get_new_info()
-				new_info_block = make_new_info_block(clean_lm=small_lm,passage=(get_conversation()+"\n\n"+new_info))
-				accepted = push_info_block_to_short_term_memory(new_info_block)
-				if accepted:
-					working_memory.append(new_info_block)
-	 
-		case _:
-			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
 
-	return small_lm_tasks
-
-def main_lm_loop(main_lm_tasks: list) -> list:
-	"""Each loop will handle ONE task from the main_lm_tasks list"""
-	if len(main_lm_tasks) == 0:
-		return
-	main_lm_tasks=importance_sorting(main_lm_tasks)
-	current_task = main_lm_tasks.pop(0)
-	match current_task['task_name']:
-		case "Generate Response":
-			logging.debug('generating response')
-			generated_response=main_lm_converse()
-			response = {
-					'source' : 'Lucid', 
-					'content' : generated_response,
-					'timestamp' : time.time(),
-					'type' : 'conversation',
-					}
-			logging.debug(f"generated response:\n{generated_response}")
-			conversation.append(response)
-			send_output(output=response)
-		case _:
-			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
-
-	return main_lm_tasks
-
-send_output(output={'content':"```md\n#=====#\n\nLucid is ONLINE\n\n#=====#\n```",'source':'system','timestamp':time.time(),'type':'conversation'})
-while True:
-	# Check for new mail if it has been more than 0.5 seconds since last check
-	if time.time()-last_get_mail_time >= 0.5:
-		last_get_mail_time = time.time()
-		new_mail.extend(get_mail())
-
-	if len(new_mail) != 0:
-		# Mail sorting based on types, starting from the oldest (the front)
-		for i in range(len(new_mail)):
-			mail_ = new_mail.pop(0)
-			#print(mail_)
-			match mail_['type']:
-				case 'conversation':
-					conversation.append(mail_)
-					logging.debug(f'Got mail: {mail_}')
-				case _:
-					tmp_mail_type = mail_['type']
-					logging.warning(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
-					pass
-
-		# generate response
-		main_lm_tasks.append({'task_name': 'Generate Response',
-							  'importance': 10})
-		
-		# Check for new info
-		small_lm_tasks.append({'task_name': 'Check for New Information',
-							'importance': 5})
-		if times_without_summary < 0:
-			times_without_summary += 1
-		else:
-			small_lm_tasks.append({'task_name': 'Summarize Conversation',
-								   'importance': 5})
-			times_without_summary = 0
-			# Graph the summary or something
-			# If the cosine similarity between the last two summaries is less than a threshold, then we should maybe create a new info block
-			# Or if the cosine similarity between the second last summary and the newest few dialog is less than a threshold, then we should maybe create a new info block
-			if len(summaries) >= 2:
-				#summaries_cross_encoder_result.append(cross_encoder([summaries[-2], summaries[-1]]))
-				pass
-'''
-		
-
-	
