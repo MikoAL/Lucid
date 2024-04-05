@@ -214,7 +214,8 @@ from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer, CrossEncoder
 cross_encoder = CrossEncoder("cross-encoder/stsb-distilroberta-base", device="cuda")
 sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-short_term_memory = chromadb.Client(Settings(anonymized_telemetry=False))
+chromadb_client = chromadb.Client(Settings(anonymized_telemetry=False))
+short_term_memory = chromadb_client.create_collection("short_term_memory")
 short_term_memory_uid = 1
 #client = chromadb.PersistentClient(path="./Chroma")
 
@@ -438,9 +439,39 @@ def play_audio(text):
 """
 # ============================ #
 # AI Council
+# Yes this is copied from "Left Brain, Right Brain" - Bo Burnham
+
+# Load council members' data from JSON file
 with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
 	AI_Council_data = json.load(f)
 
+def council_of_thought():
+	global AI_Council_data, Lucid_prompt_card
+ 
+	# Generate prompt for each council member
+	council_member_prompt = ""
+	for member in AI_Council_data:
+		council_member_prompt += f"[{member['name']}]\n- {member['personality_prompt']}\n\n"
+  
+	council_prompt = f"""[System]\nYou are Lucid, here are some info on Lucid.
+{Lucid_prompt_card}
+
+The following are Lucid's council members. Each member has a unique perspective and role in Lucid's decision-making process.
+{council_member_prompt}
+In conversations, the input from the outside world will be included, with text inside parentheses ( ) to denote thoughts within Lucid's head.
+
+Below is an example conversation between Lucid and its council members, along with interactions with Miko.
+
+[Example]
+Lucid: Miko, it seems you're struggling with your code again.
+Miko: Yeah, I can't seem to find the bug. It's driving me crazy.
+(Lumi: Miko's frustration seems to be hindering her productivity.)
+(Reverie: Maybe she needs a break to clear her mind.)
+(Lucid: Okay, let's see if we can find the bug together.)
+Lucid: Perhaps it's time for a short break, Miko. Clear your head, then we'll tackle this bug together.
+[End of Example]
+"""
+	return council_prompt
 
 # ============================ #
 # Main LM
@@ -562,6 +593,10 @@ async def main_lm_loop() -> None:
 			logging.debug(f"generated response:\n{generated_response}")
 			conversation.append(response)
 			send_output(output=response)
+   
+		case "Generate Thought":
+			logging.debug('generating thought')
+			pass
 
 		case _:
 			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
@@ -596,6 +631,7 @@ async def handle_mail() -> None:
 	return
 
 async def main() -> None:
+	global small_lm_tasks, main_lm_tasks
 	small_lm_task = asyncio.create_task(small_lm_loop())
 	main_lm_task = asyncio.create_task(main_lm_loop())
 	handle_mail_task = asyncio.create_task(handle_mail())
@@ -604,14 +640,28 @@ async def main() -> None:
 	
 	# Keep looping tasks individually
 	while True:
+	 
 		if small_lm_task.done():
-			small_lm_task = asyncio.create_task(small_lm_loop())
 			logging.debug('small_lm_task done. Restarting...')
+			small_lm_task = asyncio.create_task(small_lm_loop())
+   
+			if len(small_lm_tasks) != 0:
+				logging.debug(f"small_lm_tasks: {"\n- ".join(small_lm_tasks)}")
+	
+	
 		if main_lm_task.done():
 			logging.debug('main_lm_task done. Restarting...')
 			main_lm_task = asyncio.create_task(main_lm_loop())
+   
+			if len(main_lm_tasks) != 0:
+				logging.debug(f"main_lm_tasks: {"\n- ".join(main_lm_tasks)}")
+			else:
+				logging.debug('main_lm_tasks empty\n Adding Generate Thought task')
+				
+	
 		if handle_mail_task.done():
 			handle_mail_task = asyncio.create_task(handle_mail())
+
 		await asyncio.sleep(0.1)
 
 asyncio.run(main())
