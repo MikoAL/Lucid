@@ -50,7 +50,7 @@ logging.info('\n'.join([f"\nHost: {host}",
 # ============================ #
 # Server stuff
 
-
+# Check if the server is up
 try:
 	response = requests.get(server)
 	response.raise_for_status()  # Raise an error for bad responses (4xx or 5xx)
@@ -73,11 +73,29 @@ def send_summary(summary, server=server):
  
 # ============================ #
 # Oobabooga API stuff
+def api_encode_text(text: str):
+	json = {
+		"text": text,
+	}
+	response = requests.post(url=f"{oobabooga_api_server}/v1/internal/encode", json=json).json()
+	return response["tokens"]
+
+def api_decode_tokens(tokens: list):
+	json = {
+		"tokens": tokens,
+	}
+	response = requests.post(url=f"{oobabooga_api_server}/v1/internal/decode", json=json).json()
+	print(json)
+	print(response)
+	return response["text"]
+	
+
 def api_generate_response(prompt: str,
 						  temperature: float = 0.7,
 						  max_tokens: int = 200,
 						  top_k: int = 20,
 						  top_p: float = 1.0,
+						  logit_bias: dict = {},
 						  stop: list = ["\n"],):
 	json = {
 		"prompt": prompt,
@@ -85,11 +103,54 @@ def api_generate_response(prompt: str,
 		"max_tokens": max_tokens,
 		"top_k": top_k,
 		"top_p": top_p,
+		"logit_bias": logit_bias, # e.g. {"personality": 2.0}
 		"stop": stop,
 	}
 	return ((requests.post(url=f"{oobabooga_api_server}/v1/completions", json=json)).json())['choices'][0]['text']
 
- 
+def api_select(prompt, options, temperature, top_k, top_p):
+    if not options:
+        return None  # Handle the case of empty options list
+    options = [option.strip() for option in options]
+    tokenized_options = [api_encode_text(option) for option in options]
+    answer = ""
+    round_number = 1
+    while len(tokenized_options) > 1:  # Use > instead of != to ensure termination
+        round_number += 1
+        all_first_tokens = [option[0] for option in tokenized_options]
+        tokens_to_options = {}
+        for i in range(len(all_first_tokens)):
+            if all_first_tokens[i] not in tokens_to_options:
+                tokens_to_options[all_first_tokens[i]] = [tokenized_options[i]]
+            else:
+                tokens_to_options[all_first_tokens[i]].append(tokenized_options[i])
+        logit_bias = {}
+        for tokens_for_check in tokens_to_options:
+            logit_bias[tokens_for_check] = 100
+
+        response = api_generate_response(prompt=prompt, temperature=temperature, top_k=top_k, top_p=top_p, logit_bias=logit_bias, max_tokens=1)
+        response_token = api_encode_text(response)
+        response_token = response_token[-1]
+        prompt += response
+        answer += response
+        if response_token in tokens_to_options.keys():
+            for i in tokens_to_options[response_token]:
+                if len(i) == 0:
+                    break
+            tokenized_options = [i[1:] for i in tokens_to_options[response_token]]
+
+            
+        else:
+            # Handle the case where the response token is not found among the options
+            break  # Exit the loop to avoid potential infinite loop
+        # decode the final tokenized answer
+    for i in options:
+        if i.startswith(answer.strip()):
+            answer = i
+            break
+    return answer
+
+
 # ============================ #
 """
 Guidance stuff
@@ -440,7 +501,25 @@ def play_audio(text):
 # ============================ #
 # AI Council
 # Yes this is copied from "Left Brain, Right Brain" - Bo Burnham
+"""
+We have a task based structure for Lucid!
+The most important task is called:
+"Thinking"
 
+Thinking is done by three characters:
+- Lumi: Lucid's Left brain
+- Reverie: Lucid's Right brain
+- Lucid: The main decider
+
+I call this "Council of Thought" or something like that, the names are all WIP.
+They will be incharge of giving out tasks to the small LMs and the main LM.
+
+The council will work on a voting system.
+All members must cast a vote, and the majority vote will be the final decision.
+Incases where there are more than two options, and no majority is reached, Lucid's vote will take priority.
+
+
+"""
 # Load council members' data from JSON file
 with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
 	AI_Council_data = json.load(f)
@@ -637,6 +716,7 @@ async def main() -> None:
 	handle_mail_task = asyncio.create_task(handle_mail())
 	
 	send_output(output={'content':"```md\n#=====#\n\nLucid is ONLINE\n\n#=====#\n```",'source':'system','timestamp':time.time(),'type':'conversation'})
+	new_line = '\n- '
 	
 	# Keep looping tasks individually
 	while True:
@@ -646,7 +726,7 @@ async def main() -> None:
 			small_lm_task = asyncio.create_task(small_lm_loop())
    
 			if len(small_lm_tasks) != 0:
-				logging.debug(f"small_lm_tasks: {"\n- ".join(small_lm_tasks)}")
+				logging.debug(f"small_lm_tasks: {new_line.join((task['task_name'] for task in small_lm_tasks))}")
 	
 	
 		if main_lm_task.done():
@@ -654,7 +734,7 @@ async def main() -> None:
 			main_lm_task = asyncio.create_task(main_lm_loop())
    
 			if len(main_lm_tasks) != 0:
-				logging.debug(f"main_lm_tasks: {"\n- ".join(main_lm_tasks)}")
+				logging.debug(f"main_lm_tasks: {new_line.join((task['task_name'] for task in main_lm_tasks))}")
 			else:
 				logging.debug('main_lm_tasks empty\n Adding Generate Thought task')
 				
