@@ -556,8 +556,15 @@ Lucid: Perhaps it's time for a short break, Miko. Clear your head, then we'll ta
 # Main LM
 
 def main_lm_converse() -> str:
-	global summary
+	global summary, Lucid_prompt_card
 	prompt = f"""\
+[System]
+You are Lucid, here are some info on Lucid.
+{Lucid_prompt_card}
+Lucid only responds in plain text.
+Lucid only has knowledge of the tasks, working memory, coverstations, and summaries, she does not make stuff up.
+Respond to the conversation as Lucid, stay in character.
+
 [Tasks]
 {get_tasks()}
 
