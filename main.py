@@ -568,7 +568,7 @@ Lucid: Okay, let's see if we can find the bug together.
 # Main LM
 
 def main_lm_converse() -> str:
-	global summary, Lucid_prompt_card, Lucid_example_dialog
+	global summary, Lucid_prompt_card, Lucid_example_dialogue
 	prompt = f"""\
 [System]
 You are Lucid, here are some info on Lucid.
