@@ -165,8 +165,9 @@ prompt_path = r".\Prompts"
 
 with open(f"{prompt_path}\Lucid_prompt_card.txt", 'r', encoding='utf-8') as f:
 	Lucid_prompt_card = f.read()
-
-
+with open(f"{prompt_path}\Lucid_example_dialogue.txt", 'r', encoding='utf-8') as f:
+	Lucid_example_dialogue = f.read()
+ 
 Lucid_small_lm = small_lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
 
 # conversation format {'source':source,'content':content/message,'timestamp':timestamp}
@@ -514,6 +515,7 @@ Thinking is done by three characters:
 I call this "Council of Thought" or something like that, the names are all WIP.
 They will be incharge of giving out tasks to the small LMs and the main LM.
 
+Potential idea:
 The council will work on a voting system.
 All members must cast a vote, and the majority vote will be the final decision.
 Incases where there are more than two options, and no majority is reached, Lucid's vote will take priority.
@@ -524,7 +526,7 @@ Incases where there are more than two options, and no majority is reached, Lucid
 with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
 	AI_Council_data = json.load(f)
 
-def council_of_thought():
+def council_of_thought(current_situation: str) -> str:
 	global AI_Council_data, Lucid_prompt_card
  
 	# Generate prompt for each council member
@@ -535,20 +537,26 @@ def council_of_thought():
 	council_prompt = f"""[System]\nYou are Lucid, here are some info on Lucid.
 {Lucid_prompt_card}
 
-The following are Lucid's council members. Each member has a unique perspective and role in Lucid's decision-making process.
-{council_member_prompt}
-In conversations, the input from the outside world will be included, with text inside parentheses ( ) to denote thoughts within Lucid's head.
+The following are Lucid's internal thoughts. Each member has a unique perspective and role in Lucid's decision-making process.
+{council_member_prompt.strip()}
 
-Below is an example conversation between Lucid and its council members, along with interactions with Miko.
+In discussions, each council member will provide their input based on the situation and their unique perspective. At the end of the discussion, Lucid will make the final decision based on the council's input.
+
+Below is an example conversation between Lucid and its council members.
 
 [Example]
-Lucid: Miko, it seems you're struggling with your code again.
-Miko: Yeah, I can't seem to find the bug. It's driving me crazy.
-(Lumi: Miko's frustration seems to be hindering her productivity.)
-(Reverie: Maybe she needs a break to clear her mind.)
-(Lucid: Okay, let's see if we can find the bug together.)
-Lucid: Perhaps it's time for a short break, Miko. Clear your head, then we'll tackle this bug together.
+### Situation:
+[2023/07/23] Lucid: Miko, it seems you're struggling with your code again.
+[2023/07/23] Miko: Yeah, I can't seem to find the bug. It's driving me crazy.
+### Council Discussion:
+Reverie: Maybe he needs a break to clear his mind.
+Lumi: Or perhaps we can review the code together to identify the issue.
+Lucid: Okay, let's see if we can find the bug together.
 [End of Example]
+
+### Situation:
+{current_situation}
+### Council Discussion:
 """
 	return council_prompt
 
@@ -556,13 +564,14 @@ Lucid: Perhaps it's time for a short break, Miko. Clear your head, then we'll ta
 # Main LM
 
 def main_lm_converse() -> str:
-	global summary, Lucid_prompt_card
+	global summary, Lucid_prompt_card, Lucid_example_dialog
 	prompt = f"""\
 [System]
 You are Lucid, here are some info on Lucid.
 {Lucid_prompt_card}
+{Lucid_example_dialogue}
 Lucid only responds in plain text.
-Lucid only has knowledge of the tasks, working memory, coverstations, and summaries, she does not make stuff up.
+Lucid only has knowledge of the tasks, working memory, coverstations summaries and internal discussions, she does not make stuff up.
 Respond to the conversation as Lucid, stay in character.
 
 [Tasks]
@@ -573,6 +582,8 @@ Respond to the conversation as Lucid, stay in character.
 
 [Summary Of Previous Conversation]
 {summary}
+
+[Internal Discussions]
 
 [Conversation]
 {get_conversation()}
