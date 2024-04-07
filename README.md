@@ -5,7 +5,7 @@ Make an AI Vtuber that can pass as human even after long periods of interactions
 - Thought Process [HARD]
 - UI [HARD]
 - OBS intergration [MEDIUM]
-- Live2D [HARD]
+- Live2D [HARD] [ON HOLD]
 - Memory [HARD]
   - Short-Term [MEDIUM]
   - Long-Term [HARD]
@@ -16,13 +16,10 @@ Make an AI Vtuber that can pass as human even after long periods of interactions
   - Voice Input [MEDIUM]
 
 # Notes
-# Project Plan
+# Project Plans
+I am planning on turning her into a discord bot, so I can avoid the issue of setting up ports for non-local uses.
 
 
-
-
-
-# 1. Thought Process
 
 ### Overview
 The Thought Process module is crucial for creating a believable AI Vtuber. The ChatGPT model can be used as the foundation for generating responses and maintaining coherent conversations. However, further planning is necessary to enhance its capabilities.
@@ -48,65 +45,10 @@ The Thought Process module is crucial for creating a believable AI Vtuber. The C
 
 
 
-# 2. UI (Streaming Assets)
-
-### Overview
-The UI is a critical component for the visual representation of the AI Vtuber during live streams. It includes streaming assets such as overlays, facecam frames, and other graphical elements.
-
-### Steps
-1. **Asset Acquisition:**
-   - Acquire or create streaming assets that match the theme and personality of the AI Vtuber.
-   - Ensure the assets are compatible with the streaming platform's requirements.
-
-2. **UI Customization:**
-   - Integrate the acquired assets into the streaming software (OBS) to create a visually appealing and cohesive UI.
-   - Customize overlays for different scenarios, such as gaming, chatting, or special events.
 
 
 
-
-
-# 3. OBS Integration
-
-### Overview
-OBS integration is essential for broadcasting the AI Vtuber's stream to the audience. It involves setting up scenes, sources, and transitions for a seamless streaming experience.
-
-### Steps
-1. **Scene Setup:**
-   - Create scenes for different activities (e.g., chatting, gaming, Q&A) to provide variety during streams.
-   - Set up scene transitions for smooth switching between activities.
-
-2. **Source Configuration:**
-   - Configure sources such as the Live2D model, webcam feed, and any additional visuals or overlays.
-   - Ensure proper alignment and scaling for a professional appearance.
-
-3. **Audio Configuration:**
-   - Set up audio sources for the AI Vtuber's voice output and any background music.
-   - Test and optimize audio levels for clear and balanced sound.
-
-
-
-
-
-# 4. Live2D
-
-### Overview
-Live2D is responsible for animating the 2D model of the AI Vtuber. Commissioning a talented artist is key to bringing the character to life.
-
-### Steps
-1. **Commission Artist:**
-   - Find a skilled Live2D artist and discuss the design, movement, and expressions desired for the AI Vtuber.
-   - Provide reference material and guidelines for the character's appearance.
-
-2. **Model Rigging:**
-   - Collaborate with the artist during the rigging process to ensure the Live2D model can express a wide range of emotions and movements.
-   - Test and iterate on the rigging to achieve fluid animations.
-
-
-
-
-
-# 5. Memory
+# Memory
 
 ### Overview
 Implementing memory systems is crucial for the AI Vtuber to remember past interactions, creating a more personalized and human-like experience.
