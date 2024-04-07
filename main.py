@@ -558,7 +558,11 @@ Lucid: Okay, let's see if we can find the bug together.
 {current_situation}
 ### Council Discussion:
 """
-	return council_prompt
+	before_Lucid = api_generate_response(prompt=council_prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\nLucid:"])
+	council_prompt += before_Lucid + "\nLucid:"
+	Lucid_verdict = api_generate_response(prompt=council_prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\n"])
+	
+	return (before_Lucid + "\nLucid:" +Lucid_verdict).strip()
 
 # ============================ #
 # Main LM
