@@ -88,7 +88,8 @@ async def send_message_to_discord(message, channel_id=Lucid_channel_id):
     await bot.get_channel(channel_id).send(message)
 
 async def get_message_from_server(server=server):
-    server_response = ((await client.get(url=f'{server}/discord/fetch_newest_message')).json())['content']
+    server_response = ((await client.get(url=f'{server}/discord/fetch_newest_message')).json())
+    
     #print(f"Server response: {server_response}")
     return server_response
 
@@ -96,8 +97,10 @@ async def get_summary_from_server(server=server):
     server_response = ((await client.get(url=f'{server}/discord/get_summary')).json())['content']
     return server_response
 
+last_response = ""
 @tasks.loop(seconds=0.1)
-async def get_message_from_server_loop(last_response=""):
+async def get_message_from_server_loop():
+    global last_response
     #print("Getting response from server")
     try:
         response = await get_message_from_server()

@@ -1,11 +1,20 @@
-import uvicorn
+
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
-import logging
 import time
+import uvicorn
+import logging
+import sys
+uvicorn_logger = logging.getLogger("uvicorn")
+uvicorn_logger.setLevel(logging.INFO)
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
+# logger.setLevel(logging.DEBUG)
+# stream_handler = logging.StreamHandler(sys.stdout)
+# log_formatter = logging.Formatter("%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s")
+# stream_handler.setFormatter(log_formatter)
+# logger.addHandler(stream_handler)
+app = FastAPI(title='Lucid_server')
+# logger.info('API is starting up')
 class Mail(BaseModel):
     content: str
     source: str | None = 'unknown'
@@ -20,7 +29,9 @@ class Output(BaseModel):
 class Summary(BaseModel):
     content: str
     
-app = FastAPI()
+class DiscordMessage(BaseModel):
+    message: str
+
 
 mailbox = []
 # Using .append we can get mail into the 'mailbox'
@@ -38,6 +49,7 @@ async def root():
 @app.post("/postbox")
 async def post_mail(mail: Mail):
     global mailbox
+    uvicorn_logger.info(f"Got message from {mail.source}: {mail.content}")
     #test_str = f"content: {mail.message}\nsource: {mail.source}\ntimestamp: {mail.timestamp}"
     mailbox.append(mail)
     return  #test_str
@@ -46,7 +58,7 @@ async def post_mail(mail: Mail):
 async def retrive_mail():
     global mailbox
     _ = mailbox.copy()
-    mailbox.clear()
+    mailbox = []
     return _
 
 
@@ -54,13 +66,13 @@ async def retrive_mail():
 async def test(test):
     return {'result':test['message']}
 
-@app.post("/output") # Needs a more creative name, and I'm not even sure if I should put it here
+"""@app.post("/output") # Needs a more creative name, and I'm not even sure if I should put it here
 async def output(output: Output):
     global new_message
-    logging.info(f'Lucid: {output.content}')
+    # logger.info(f'Lucid: {output.content}')
     new_message=output
     return 
-
+"""
 @app.get('/display')
 async def display_output():
     global new_message
@@ -68,20 +80,22 @@ async def display_output():
     _, new_message = new_message, _
     return _
 
-@app.get('/discord/send_message')
-async def send_message_to_discord(message: str):
+@app.post('/discord/send_message')
+async def send_message_to_discord(message:DiscordMessage):
     global new_message
-    new_message = Output(content=message)
+    uvicorn_logger.info(f"Got message from server: {message}")
+    new_message = message.message
     return
     
 @app.get('/discord/fetch_newest_message')
 async def get_ai_response():
     global new_message
     return new_message
+
 @app.post('/discord/post_summary')
 async def summary_from_server(summary: Summary):
     global new_summary
-    logging.info(f'Discord: {summary.content}')
+    # logger.info(f'Discord: {summary.content}')
     new_summary = summary
     return
 @app.get('/discord/get_summary')

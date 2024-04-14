@@ -10,9 +10,10 @@ import json
 import re
 import numpy as np
 import transformers
-transformers.utils.logging.disable_default_handler
-
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p')
+import rich
+transformers.utils.logging.disable_default_handler()
+from rich.logging import RichHandler
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p', handlers=[RichHandler(rich_tracebacks=True)])
 #logging.disable()
 # Get the absolute path of the script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -59,8 +60,11 @@ class ServerHandler():
         self.unread_mails = []
     
     def check_mailbox(self)->None:
+        logging.info(f"Checking mailbox")
         new_mails = (httpx.get(f'{self.server}/mailbox')).json()
+        logging.info(f"Got: {new_mails}")
         if new_mails != []:
+            logging.info(f"Got new mails: {new_mails}")
             self.unread_mails.extend(new_mails)
     
     def get_unread_mails(self)->list:
@@ -119,7 +123,7 @@ from transformers.generation import StoppingCriteriaList
 class LucidCouncil(LocalAgent):
     def __init__(self, model, tokenizer, members: dict, additional_tools=None, council_example_prompt=council_example_prompt):
         self.members = members
-        stop_conditions = ["\n\n", "=====", "System:"]
+        stop_conditions = ["\n\n", "=====", "System:", "Miko:"]
         #for member in self.members:
         #    stop_conditions.append(f"{member['name']}:")
         self.stop_conditions = stop_conditions
@@ -221,7 +225,7 @@ Tools:
         result = self.generate_one(prompt, stop=self.stop_conditions)
         self.chat_history = (prompt + result).strip()
         self.chat_turn_counter += 1
-        code = self.clean_code_for_chat(result)
+        explanation, code = self.clean_code_for_chat(result)
 
         self.log(f"==Response from the agent==\n{result}") 
 
@@ -237,21 +241,29 @@ Tools:
                 return f"{tool_code}\n{code}"
             
 
-        
+            
     def clean_code_for_chat(self, result):
-        # This is my own version that will replace the one in Agent.py
-        """Extracts the code section surrounded by ```python and ``` from a string."""
+        """Extracts the explanation and code sections from a string."""
         start_marker = "```python"
         end_marker = "```"
+        
+        # Find the start and end indices of the code section
         start_idx = result.find(start_marker)
         if start_idx == -1:
-            return None  # No code section found
+            return None, None  # No code section found
         start_idx += len(start_marker) + 1  # Move past the marker and newline
         end_idx = result.find(end_marker, start_idx)
         if end_idx == -1:
-            return None  # No closing marker found
+            return None, None  # No closing marker found
+        
+        # Extract the code section
         code_section = result[start_idx:end_idx].strip()
-        return code_section
+        
+        # Extract the explanation section
+        explanation_end_idx = result.rfind("\n", 0, start_idx)
+        explanation = result[:explanation_end_idx].strip()
+        
+        return explanation, code_section
 
         """ This is the old version of the code that I am replacing
         
@@ -277,17 +289,18 @@ Tools:
 class send_discord_message(Tool):
     name = "send_discord_message"
     description = "Sends a message to the discord server"
-    inputs = ["message"]
+    inputs = ["text"]
     outputs = []
     
     def __call__(self, message):
+        logging.info(f"Sending message to discord: {message}")
         server_handler.send_discord_message(message)
 
 class recall_memory(Tool):
     name = "recall_memory"
     description = "Tries to find a related memory from the past"
     inputs = ["text"]
-    outputs = ["memory"]
+    outputs = ["text"]
     
     def __call__(self, text):
         # TODO: Implement a memory system
@@ -297,7 +310,7 @@ class recall_memory(Tool):
 class save_information(Tool):
     name = "save_information"
     description = "Saves information to memory to be used later."
-    inputs = ["information"]
+    inputs = ["text"]
     outputs = []
     
     def __call__(self, information):
@@ -323,8 +336,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, Tool, pipeline
 
 gptq_config = GPTQConfig(bits=4, exllama_config={"version":2})
-model = AutoModelForCausalLM.from_pretrained("TheBloke/Mistral-7B-Instruct-v0.2-GPTQ", device_map="cuda:0", quantization_config=gptq_config)
-tokenizer = AutoTokenizer.from_pretrained("TheBloke/Mistral-7B-Instruct-v0.2-GPTQ")
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", device_map="cuda:0", quantization_config=gptq_config)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
 
 server_handler = ServerHandler(server)
 send_discord_message_tool = send_discord_message()
@@ -347,7 +360,7 @@ while True:
                 case "discord_message":
                     Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
                     
-                
+    #logging.info(f"Chatting with the council")
     Lucid_council.chat()
     logging.info(f"{Lucid_council.chat_history}")
     time.sleep(0.2)
