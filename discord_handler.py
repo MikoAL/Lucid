@@ -55,7 +55,7 @@ async def on_ready():
 
     members = '\n - '.join([member.name for member in guild.members])
     print(f'Guild Members:\n - {members}')
-    get_ai_response_loop.start()
+    get_message_from_server_loop.start()
     get_new_summary_loop.start()
     
 @bot.event
@@ -66,7 +66,7 @@ async def on_message(message):
     if message.channel.id == Lucid_channel_id:
         # This function will be called whenever a message is sent in the specified channel
         if message.author != bot.user:
-            formatted_message = {'content':message.content,'source':message.author.name,'timestamp':time.time(), 'type':'conversation'}
+            formatted_message = {'content':message.content,'source':message.author.name,'timestamp':time.time(), 'type':'discord_message'}
             async with bot.get_channel(Lucid_channel_id).typing():
                 await send_user_message_to_server(formatted_message)
 
@@ -83,12 +83,12 @@ async def send_user_message_to_server(formatted_json: dict, server=server):
     print(f"Got message from {formatted_json['source']}: {formatted_json['content']}")
     await client.post(url=f'{server}/postbox', json=(formatted_json))
 
-async def send_ai_response_to_discord(message, channel_id=Lucid_channel_id):
+async def send_message_to_discord(message, channel_id=Lucid_channel_id):
     print(f"Sending message to channel")
     await bot.get_channel(channel_id).send(message)
 
-async def get_ai_response_from_server(server=server):
-    server_response = ((await client.get(url=f'{server}/display')).json())['content']
+async def get_message_from_server(server=server):
+    server_response = ((await client.get(url=f'{server}/discord/fetch_newest_message')).json())['content']
     #print(f"Server response: {server_response}")
     return server_response
 
@@ -97,13 +97,14 @@ async def get_summary_from_server(server=server):
     return server_response
 
 @tasks.loop(seconds=0.1)
-async def get_ai_response_loop():
+async def get_message_from_server_loop(last_response=""):
     #print("Getting response from server")
     try:
-        response = await get_ai_response_from_server()
-        if response != '':
+        response = await get_message_from_server()
+        if response != last_response:
             print(f"Got response: {response}")
-            await send_ai_response_to_discord(response)
+            last_response = response
+            await send_message_to_discord(response)
     except Exception as e:
         print(f"Error: {e}")
         pass

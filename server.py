@@ -68,6 +68,16 @@ async def display_output():
     _, new_message = new_message, _
     return _
 
+@app.get('/discord/send_message')
+async def send_message_to_discord(message: str):
+    global new_message
+    new_message = Output(content=message)
+    return
+    
+@app.get('/discord/fetch_newest_message')
+async def get_ai_response():
+    global new_message
+    return new_message
 @app.post('/discord/post_summary')
 async def summary_from_server(summary: Summary):
     global new_summary
