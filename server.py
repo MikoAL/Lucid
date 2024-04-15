@@ -40,7 +40,7 @@ mailbox = []
 # source
 # timestamp
 # 
-new_message = Output(content='')
+new_discord_message = DiscordMessage(message='')
 new_summary = Summary(content='No summary available.')
 @app.get("/")
 async def root():
@@ -73,24 +73,17 @@ async def output(output: Output):
     new_message=output
     return 
 """
-@app.get('/display')
-async def display_output():
-    global new_message
-    _ = Output(content='')
-    _, new_message = new_message, _
-    return _
-
 @app.post('/discord/send_message')
 async def send_message_to_discord(message:DiscordMessage):
-    global new_message
+    global new_discord_message
     uvicorn_logger.info(f"Got message from server: {message}")
-    new_message = message.message
+    new_discord_message = message.message
     return
     
 @app.get('/discord/fetch_newest_message')
 async def get_ai_response():
-    global new_message
-    return new_message
+    global new_discord_message
+    return new_discord_message
 
 @app.post('/discord/post_summary')
 async def summary_from_server(summary: Summary):

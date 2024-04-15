@@ -11,6 +11,7 @@ import re
 import numpy as np
 import transformers
 import rich
+
 transformers.utils.logging.disable_default_handler()
 from rich.logging import RichHandler
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p', handlers=[RichHandler(rich_tracebacks=True)])
@@ -31,11 +32,13 @@ with open('settings.yaml', 'r') as file:
 host = settings['host']
 port = settings['port']
 server = f'http://{host}:{port}'
+
+"""
 small_lm_name = settings['small_lm_settings']['language_model']
 small_lm_temperature = settings['small_lm_settings']['temperature']
 small_lm_top_k = settings['small_lm_settings']['top_k']
 small_lm_top_p = settings['small_lm_settings']['top_p']
-
+"""
 device_for_tools = "cuda:1" #settings['device_for_tools']
 
 prompt_path = r".\Prompts"
@@ -47,7 +50,6 @@ with open(f"{prompt_path}\Lucid_example_dialogue.txt", 'r', encoding='utf-8') as
 
 with open(f"{prompt_path}\council_example_prompt.txt", 'r', encoding='utf-8') as f:
 	council_example_prompt = f.read()
-
 # Load council members' data from JSON file
 with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
 	AI_Council_data = json.load(f)
@@ -79,27 +81,103 @@ class ServerHandler():
 
 # ===== ===== ===== #
 # Chroma stuff
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer, CrossEncoder
-cross_encoder = CrossEncoder("cross-encoder/stsb-distilroberta-base", device=device_for_tools)
-sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device=device_for_tools)
-chromadb_client = chromadb.Client(Settings(anonymized_telemetry=False))
-short_term_memory = chromadb_client.create_collection("short_term_memory")
-short_term_memory_uid = 1
 
 """
+
 This is what a Info Block should look like
 {
   'object_type' : 'entity',
   'object_name' : 'Miko',
   'content' : 'Miko like Nintendo games.',
-  'timestamp' : '2021-10-15 17:37:00',
+  'timestamp' : a float number,
   'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32),
+}
+
+This is what an unprocessed Info Block should look like
+{
+    'content' : 'Miko like Nintendo games.',
+    'timestamp' : a float number,
+    'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32),
 }    
 """
 
+class Memory():
+    
+    def __init__(self, device_for_tools=device_for_tools):
+        import chromadb
+        from chromadb.config import Settings
+        from sentence_transformers import SentenceTransformer, CrossEncoder
+        self.cross_encoder = CrossEncoder("cross-encoder/stsb-distilroberta-base", device=device_for_tools)
+        self.sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device=device_for_tools)
+        self.chromadb_client = chromadb.Client(Settings(anonymized_telemetry=False))
+        self.short_term_memory_chroma_collection = self.chromadb_client.create_collection("short_term_memory")
+        self.short_term_memory_uid = 1
 
+        self.working_memory = []
+    
+    def check_for_double(self, unprocessed_info_block: dict, threshold: float = 0.8) -> list: # NOTE: This is an arbitrary threshold
+        """The function checks if a simular info block is already in the memory. If it is, it returns the ID of the similar info block.
+        If not, it returns an empty list."""
+        query_result = self.short_term_memory_chroma_collection.query(
+            query_embeddings=[unprocessed_info_block['vector']],    
+            n_results=4
+        )
+        sentence_combinations = [[unprocessed_info_block['content'], sentence] for sentence in query_result["documents"]]
+        scores = self.cross_encoder.predict(sentence_combinations)
+        ranked_indices = np.argsort(scores)[::-1]
+        # Get the original IDs for scores above the threshold
+        high_score_ids = [query_result["ids"][i] for i in ranked_indices if scores[i] >= threshold]
+        return high_score_ids
+            
+    def process_unprocessed_info_block(self, unprocessed_info_block: dict):
+        # TODO: Implement a processing for the unprocessed info block
+        pass    
+    
+    def without_keys(d, keys):
+        return {k: v for k, v in d.items() if k not in keys}
+
+    
+    def display_working_memory(self) -> str:
+        if len(self.working_memory) == 0:
+            return "```md\n# Working Memory\n\nEmpty\n```"
+        else:
+            working_memory_str = "```md\n# Working Memory\n\n"
+            for i in range(len(self.working_memory)):
+                working_memory_str += f"{i+1}. {self.working_memory[i]['content']}\n"
+            working_memory_str += "```"
+            return working_memory_str
+    
+    def add_working_memory(self, information: str) -> None:
+        unprocessed_info_block = {
+            'content' : information,
+            'timestamp' : time.time(),
+            'vector': self.sentence_transformer.encode(information)
+        }
+        doubles = self.check_for_double(unprocessed_info_block)
+        if len(doubles) == 0:
+            self.working_memory.append(unprocessed_info_block)
+        else:
+            pass
+    def delete_working_memory(self, line_number:int) -> None:
+        """Deleting is kind of misleading. It actually moves the memory to short term memory."""
+        moved_memory = self.working_memory.pop(line_number-1)
+        self.add_to_short_term_memory(moved_memory)
+        
+    def clear_working_memory(self):
+        for i in range(len(self.working_memory)):
+            self.delete_working_memory(1)
+    
+    def add_to_short_term_memory(self, unprocessed_info_block: dict):
+        info_block = self.process_unprocessed_info_block(unprocessed_info_block)
+        info_block_no_vector = self.without_keys(info_block, ['vector'])
+        self.short_term_memory_chroma_collection.add(
+            ids=[self.short_term_memory_uid],
+            documents=[info_block],
+            embeddings=[info_block['vector']],
+            metadata=[info_block_no_vector],
+        )
+        self.short_term_memory_uid += 1
+        
 # ===== ===== ===== #
 # Lucid Agents
 import torch
@@ -123,7 +201,7 @@ from transformers.generation import StoppingCriteriaList
 class LucidCouncil(LocalAgent):
     def __init__(self, model, tokenizer, members: dict, additional_tools=None, council_example_prompt=council_example_prompt):
         self.members = members
-        stop_conditions = ["\n\n", "=====", "System:", "Miko:"]
+        stop_conditions = ["\n\n", "=====", "System:", "Miko:", "```md\n# Working Memory"]
         #for member in self.members:
         #    stop_conditions.append(f"{member['name']}:")
         self.stop_conditions = stop_conditions
@@ -315,6 +393,15 @@ class save_information(Tool):
     
     def __call__(self, information):
         # TODO: Implement a memory system
+        pass
+
+class write_to_working_memory(Tool):
+    name = "write_to_working_memory"
+    description = "Writes information to working_memory to be used later."
+    inputs = ["text"]
+    outputs = []
+    
+    def __call__(self, information):
         pass
 
 class print_tool(Tool):
