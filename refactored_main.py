@@ -14,7 +14,7 @@ import rich
 import websockets
 transformers.utils.logging.disable_default_handler()
 from rich.logging import RichHandler
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p', handlers=[RichHandler(rich_tracebacks=True)])
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p', handlers=[RichHandler(rich_tracebacks=True)])
 #logging.disable()
 # Get the absolute path of the script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -55,32 +55,33 @@ with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
 # ===== ===== ===== #
 # Server Handler
 class ServerHandler():
-    async def __init__(self, host, port):
+    def __init__(self, host, port):
         self.uri = f"ws://{host}:{port}/ws/main_script"
-        self.connect()
+        self.server_websocket = None
         self.read_mails = []
         self.unread_mails = []
-        
+    async def keep_collecting_mailbox(self):
+            #await self.send_information({"type": "command", "command_type":"collect_mailbox"})
+            while True:
+                new_mails = await self.server_websocket.recv()
+                new_mails = json.loads(new_mails)
+                logging.info(f"Got: {new_mails}")
+                if new_mails != []:
+                    logging.info(f"Got new mails: {new_mails}")
+                    self.unread_mails.extend(new_mails)      
+                asyncio.sleep(0.1)  
+                
     async def connect(self):
-        self.websocket = await websockets.connect(self.uri)
-    
-        
-    async def collect_mailbox(self):
-            await self.send_information({"type": "command", "command_type":"collect_mailbox"})
-            new_mails = await json.loads(self.websocket.recv())
-            logging.info(f"Got: {new_mails}")
-            if new_mails != []:
-                logging.info(f"Got new mails: {new_mails}")
-                self.unread_mails.extend(new_mails)
+        self.server_websocket = await websockets.connect(self.uri)
+        await self.send_information({"type": "log", "content": "main_script connected?"})
     
     async def send_information(self, information: dict):
-        await self.websocket.send_text(json.dumps(information))
+        await self.server_websocket.send(json.dumps(information))
     
     async def send_discord_message(self, message: str):
-        await self.send_information({"type": "Lucid_output", "output_type":"discord_message","content": message}) 
+        await self.send_information({"type": "Lucid_output", "output_type":"discord_message","content": message})
     
     def get_unread_mails(self)->list:
-        self.collect_mailbox()
         temp_unread_mails = self.unread_mails.copy()
         self.read_mails.extend(self.unread_mails)
         self.unread_mails = []
@@ -381,7 +382,7 @@ class send_discord_message(Tool):
     
     def __call__(self, message):
         logging.info(f"Sending message to discord: {message}")
-        server_handler.send_discord_message(message)
+        asyncio.create_task(server_handler.send_discord_message(message))
 
 class recall_memory(Tool):
     name = "recall_memory"
@@ -448,7 +449,7 @@ tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
 model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-bnb-4bit", device_map="cuda:0", load_in_4bit=True)
 tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-bnb-4bit")
 
-server_handler = ServerHandler(host=host, port=port)
+
 Lucid_memory = Memory()
 
 send_discord_message_tool = send_discord_message()
@@ -463,25 +464,34 @@ Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data,
                                  get_working_memory_tool,
                                  ])
 
-# Start the loop
-last_mail = None
-last_get_mail_time = 0
-while True:
-    if time.time()-last_get_mail_time >= 0.5:
-        last_get_mail_time = time.time()
-        new_mails = server_handler.get_unread_mails()
-    if new_mails != []:
-        logging.info(f"Got new mails: {new_mails}")
-        for mail in new_mails:
-            # Format the mail
-            logging.info(f"Got mail: {mail}")
-            match mail['type']:
-                case "discord_message":
-                    Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
-    else:
-        if Lucid_council.chat_history is None:
-            Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
-    #logging.info(f"Chatting with the council")
-    Lucid_council.chat()
-    logging.info(f"{Lucid_council.chat_history}")
-    # time.sleep(0.2)
+server_handler = ServerHandler(host=host, port=port)
+
+
+
+async def main():
+    global server_handler, Lucid_council, Lucid_memory
+    # Start the loop
+    last_mail = None
+    last_get_mail_time = 0
+    await server_handler.connect()
+    asyncio.create_task(server_handler.keep_collecting_mailbox())
+    while True:
+        if time.time()-last_get_mail_time >= 0.5:
+            last_get_mail_time = time.time()
+            new_mails = server_handler.get_unread_mails()
+        if new_mails != []:
+            logging.info(f"Got new mails: {new_mails}")
+            for mail in new_mails:
+                # Format the mail
+                logging.info(f"Got mail: {mail}")
+                match mail['type']:
+                    case "discord_message":
+                        Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
+        else:
+            if Lucid_council.chat_history is None:
+                Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
+        #logging.info(f"Chatting with the council")
+        Lucid_council.chat()
+        logging.info(f"{Lucid_council.chat_history}")
+        # time.sleep(0.2)
+asyncio.run(main())

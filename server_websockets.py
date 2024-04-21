@@ -9,10 +9,10 @@ import time
 
 app = FastAPI()
 # Configure logger
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.info('API is starting up')
-
+logger.debug('Debugging is enabled')
 uncollected_mails = []
 
 class ServerConnectionManager:
@@ -63,7 +63,7 @@ async def discord_handler_endpoint(websocket: WebSocket):
     await manager.connect_discord_handler(websocket)
     try:
         while True:
-            message = await manager.discord_handler_websocket.recv()
+            message = await manager.discord_handler_websocket.receive_text()
             logger.info(f"Received message: {message}")
             data = json.loads(message)
             message_type = data.get("type")
@@ -111,6 +111,7 @@ async def main_script_endpoint(websocket: WebSocket):
                             manager.send_discord_message(content)
                             # Log the content...
 
-    except (WebSocketDisconnect, ConnectionClosed):
+    except (WebSocketDisconnect, ConnectionClosed) as e:
+        logger.info(f"main_script has disconnected because of {e}")
         manager.disconnect(websocket)
-        await manager.log_to_discord(f"main_script has disconnected")
+        await manager.log_to_discord(f"main_script has disconnected because of {e}")

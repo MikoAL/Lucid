@@ -10,6 +10,8 @@ from discord.ext import commands, tasks
 
 import websockets
 
+from dotenv import load_dotenv
+
 # Get the absolute path of the script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the working directory to the script's directory
@@ -23,8 +25,10 @@ host = settings['host']
 port = settings['port']
 server_ws_uri = f"ws://{host}:{port}/ws/discord_handler"
 
+load_dotenv()
+
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-GUILD = os.getenv('DISCORD_GUILD_ID')
+GUILD = int(os.getenv('DISCORD_GUILD_ID'))
 
 intents = discord.Intents.all()
 command_prefix = '/'
@@ -32,7 +36,8 @@ bot = commands.Bot(command_prefix=command_prefix, intents=intents)
 Lucid_channel_id = settings['discord']['channels']['Lucid_channel_id']
 log_channel_id = settings['discord']['channels']['log_channel_id']
 new_summary = "No summary has been generated yet."
-async def send_discord_message(content, guild_id=GUILD, channel_id=Lucid_channel_id):
+async def send_discord_message(content, channel_id=Lucid_channel_id, guild_id=GUILD):
+    print(f"Sending message to channel {channel_id} in guild {guild_id}.")
     guild = bot.get_guild(guild_id)
     if guild is None:
         print(f"Guild with ID {guild_id} not found.")
@@ -62,6 +67,7 @@ class DiscordConnectionManager:
     async def receive_from_server(self):
         while True:
             data = await self.server_websocket.recv()
+            data = json.loads(data)
             print("Received data from server:", data)
             message_type = data.get("type")
             content = data.get("content")
@@ -90,7 +96,7 @@ async def on_ready():
     
     print("Connecting to server...")
     
-    send_discord_message("```md\nLucid is now ONLINE.\n```", channel_id=log_channel_id)
+    await send_discord_message("```md\nLucid is now ONLINE.\n```", channel_id=log_channel_id)
     
     await discord_connection_manager.connect_to_server()
 
