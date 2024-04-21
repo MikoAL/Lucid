@@ -11,7 +11,7 @@ import re
 import numpy as np
 import transformers
 import rich
-
+import websockets
 transformers.utils.logging.disable_default_handler()
 from rich.logging import RichHandler
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p', handlers=[RichHandler(rich_tracebacks=True)])
@@ -20,7 +20,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 script_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the working directory to the script's directory
 os.chdir(script_dir)
-
 
 # ===== ===== ===== #
 # Settings
@@ -56,28 +55,37 @@ with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
 # ===== ===== ===== #
 # Server Handler
 class ServerHandler():
-    def __init__(self, server):
-        self.server = server
+    async def __init__(self, host, port):
+        self.uri = f"ws://{host}:{port}/ws/main_script"
+        self.connect()
         self.read_mails = []
         self.unread_mails = []
+        
+    async def connect(self):
+        self.websocket = await websockets.connect(self.uri)
     
-    def check_mailbox(self)->None:
-        logging.info(f"Checking mailbox")
-        new_mails = (httpx.get(f'{self.server}/mailbox')).json()
-        logging.info(f"Got: {new_mails}")
-        if new_mails != []:
-            logging.info(f"Got new mails: {new_mails}")
-            self.unread_mails.extend(new_mails)
+        
+    async def collect_mailbox(self):
+            await self.send_information({"type": "command", "command_type":"collect_mailbox"})
+            new_mails = await json.loads(self.websocket.recv())
+            logging.info(f"Got: {new_mails}")
+            if new_mails != []:
+                logging.info(f"Got new mails: {new_mails}")
+                self.unread_mails.extend(new_mails)
+    
+    async def send_information(self, information: dict):
+        await self.websocket.send_text(json.dumps(information))
+    
+    async def send_discord_message(self, message: str):
+        await self.send_information({"type": "Lucid_output", "output_type":"discord_message","content": message}) 
     
     def get_unread_mails(self)->list:
-        self.check_mailbox()
+        self.collect_mailbox()
         temp_unread_mails = self.unread_mails.copy()
         self.read_mails.extend(self.unread_mails)
         self.unread_mails = []
         return temp_unread_mails
     
-    def send_discord_message(self, message):
-        httpx.post(f'{self.server}/discord/send_message', json={'message': message})
 
 # ===== ===== ===== #
 # Chroma stuff
@@ -115,7 +123,7 @@ class Memory():
 
         self.working_memory = []
     
-    def check_for_double(self, unprocessed_info_block: dict, threshold: float = 0.8) -> list: # NOTE: This is an arbitrary threshold
+    def check_for_similar_memories(self, unprocessed_info_block: dict, threshold: float = 0.8) -> list: # NOTE: This is an arbitrary threshold
         """The function checks if a simular info block is already in the memory. If it is, it returns the ID of the similar info block.
         If not, it returns an empty list."""
         query_result = self.short_term_memory_chroma_collection.query(
@@ -139,12 +147,11 @@ class Memory():
     
     def display_working_memory(self) -> str:
         if len(self.working_memory) == 0:
-            return "```md\n# Working Memory\n\nEmpty\n```"
+            return "\n# Working Memory\nEmpty"
         else:
-            working_memory_str = "```md\n# Working Memory\n\n"
+            working_memory_str = "\n# Working Memory\n"
             for i in range(len(self.working_memory)):
                 working_memory_str += f"{i+1}. {self.working_memory[i]['content']}\n"
-            working_memory_str += "```"
             return working_memory_str
     
     def add_working_memory(self, information: str) -> None:
@@ -153,13 +160,14 @@ class Memory():
             'timestamp' : time.time(),
             'vector': self.sentence_transformer.encode(information)
         }
-        doubles = self.check_for_double(unprocessed_info_block)
+        doubles = self.check_for_similar_memories(unprocessed_info_block)
         if len(doubles) == 0:
             self.working_memory.append(unprocessed_info_block)
         else:
             pass
     def delete_working_memory(self, line_number:int) -> None:
-        """Deleting is kind of misleading. It actually moves the memory to short term memory."""
+        """Deleting is kind of misleading. It actually moves the memory to short term memory. 
+        But calling it moving to short term memory is also confusing."""
         moved_memory = self.working_memory.pop(line_number-1)
         self.add_to_short_term_memory(moved_memory)
         
@@ -201,7 +209,7 @@ from transformers.generation import StoppingCriteriaList
 class LucidCouncil(LocalAgent):
     def __init__(self, model, tokenizer, members: dict, additional_tools=None, council_example_prompt=council_example_prompt):
         self.members = members
-        stop_conditions = ["\n\n", "=====", "System:", "Miko:", "```md\n# Working Memory"]
+        stop_conditions = ["\n\n", "=====", "System:", "Miko:", "```md\n# Working Memory", "<|im_start|>", "<|im_end|>","<|endoftext|>"]
         #for member in self.members:
         #    stop_conditions.append(f"{member['name']}:")
         self.stop_conditions = stop_conditions
@@ -211,6 +219,7 @@ class LucidCouncil(LocalAgent):
             council_member_prompt += f"[{member['name']}]\n- {member['personality_prompt']}\n\n"
         council_prompt_template = f"""\
 Below are a series of dialogues between Lucid and her inner council.
+All dialogues are in English.
 
 Here are some information on Lucid:
 {Lucid_prompt_card.strip()}
@@ -235,12 +244,12 @@ Tools:
 
         super().__init__(model, tokenizer, chat_prompt_template=council_prompt_template, run_prompt_template=None, additional_tools=additional_tools)
         
-    def generate_one(self, prompt, stop, max_new_tokens=200):
+    def generate_one(self, prompt, stop, max_new_tokens=200, temperature=0.8):
         encoded_inputs = self.tokenizer(prompt, return_tensors="pt").to(self._model_device)
         src_len = encoded_inputs["input_ids"].shape[1]
         stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(stop, self.tokenizer)])
         outputs = self.model.generate(
-            encoded_inputs["input_ids"], max_new_tokens=max_new_tokens, stopping_criteria=stopping_criteria
+            encoded_inputs["input_ids"], max_new_tokens=max_new_tokens, temperature=temperature, stopping_criteria=stopping_criteria
         )
 
         result = self.tokenizer.decode(outputs[0].tolist()[src_len:])
@@ -402,19 +411,27 @@ class write_to_working_memory(Tool):
     outputs = []
     
     def __call__(self, information):
+        Lucid_memory.add_working_memory(information)
         pass
 
-class print_tool(Tool):
+class print_to_council(Tool):
     name = "print_to_council"
     description = "Prints into the council chat as System."
     inputs = ["string"]
     outputs = ["text"]
     
     def __call__(self, text):
-        global Lucid_council
         Lucid_council.add_system_message(f"[result of print_to_council() from python code] {text}")
         return text
-        
+
+class get_working_memory(Tool):
+    name = "get_working_memory"
+    description = "Returns the current working memory."
+    inputs = []
+    outputs = ["text"]
+    
+    def __call__(self):
+        return Lucid_memory.display_working_memory()
 
 
 # ===== ===== ===== #
@@ -422,22 +439,37 @@ class print_tool(Tool):
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, Tool, pipeline
 
+"""
 gptq_config = GPTQConfig(bits=4, exllama_config={"version":2})
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", device_map="cuda:0", quantization_config=gptq_config)
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
+"""
 
-server_handler = ServerHandler(server)
+model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-bnb-4bit", device_map="cuda:0", load_in_4bit=True)
+tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-bnb-4bit")
+
+server_handler = ServerHandler(host=host, port=port)
+Lucid_memory = Memory()
+
 send_discord_message_tool = send_discord_message()
-print_tool_tool = print_tool()
-
+print_to_council_tool = print_to_council()
+get_working_memory_tool = get_working_memory()
 
 # Create the Lucid Council
 Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data, 
-                             additional_tools=[send_discord_message_tool, print_tool_tool])
+                             additional_tools=[
+                                 send_discord_message_tool,
+                                 print_to_council_tool,
+                                 get_working_memory_tool,
+                                 ])
+
 # Start the loop
 last_mail = None
+last_get_mail_time = 0
 while True:
-    new_mails = server_handler.get_unread_mails()
+    if time.time()-last_get_mail_time >= 0.5:
+        last_get_mail_time = time.time()
+        new_mails = server_handler.get_unread_mails()
     if new_mails != []:
         logging.info(f"Got new mails: {new_mails}")
         for mail in new_mails:
@@ -446,8 +478,10 @@ while True:
             match mail['type']:
                 case "discord_message":
                     Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
-                    
+    else:
+        if Lucid_council.chat_history is None:
+            Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
     #logging.info(f"Chatting with the council")
     Lucid_council.chat()
     logging.info(f"{Lucid_council.chat_history}")
-    time.sleep(0.2)
+    # time.sleep(0.2)

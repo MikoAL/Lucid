@@ -10,6 +10,10 @@ oobabooga_api:
 # https://rentry.org/llm-settings
 # https://huggingface.co/docs/transformers/main_classes/configuration
 
+discord:
+  channels:
+    Lucid_channel_id: 1222433056778879016
+    log_channel_id: 1229405523846238320
 
 # Small LLM is using guidance
 small_lm_settings:

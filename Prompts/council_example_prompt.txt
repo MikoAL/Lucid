@@ -15,6 +15,7 @@ Lucid: Based on your inputs, I will proceed with the `document_qa` tool to ask a
 answer = document_qa(document, question="Who is the oldest person?")
 send_discord_message(message=f"The answer is {answer}.")
 ```
+Lucid: What should we do now?
 
 =====
 
@@ -59,6 +60,7 @@ print(f"The log contains 'fail': {contains_fail}")"""
 
 send_discord_message(message=script)
 ```
+Lumi: That should work.
 
 =====
 
@@ -80,18 +82,26 @@ send_discord_message(message="Sure thing Miko! But can you send the list of temp
 
 Lumi: He will take sometime to respond, let's write out the code for temperature conversion in the meantime.
 
-Lucid: I'll convert the temperatures using the formula provided by Lumi and add a brief explanation as Reverie suggested.
+Lucid: I'll write the formula provided by Lumi into working memory and add a brief explanation as Reverie suggested.
 
 ```python
 code = """\
 # Converting temperatures from Celsius to Fahrenheit
 fahrenheit_temperatures = [c * 9/5 + 32 for c in celsius_temperatures]"""
-send_discord_message(f"Converted temperatures: {fahrenheit_temperatures}")
+write_to_working_memory(code)
 ```
 
 System: [Discord Message from user miko_al] 23, 30, 10, 16, 27
 
-Lucid: Miko has provided the list of temperatures: 23, 30, 10, 16, 27. Now, let's integrate this list into the code.
+Lucid: Miko has provided the list of temperatures: 23, 30, 10, 16, 27. Now, let's integrate this list into the code we just worked out.
+
+```python
+print_to_council(get_working_memory())
+```
+System: [result of print_to_council() from python code] 
+# Working Memory
+1. # Converting temperatures from Celsius to Fahrenheit
+fahrenheit_temperatures = [c * 9/5 + 32 for c in celsius_temperatures]
 
 ```python
 # Given list of temperatures in Celsius
@@ -102,3 +112,4 @@ fahrenheit_temperatures = [c * 9/5 + 32 for c in celsius_temperatures]
 send_discord_message(message=f"Converted temperatures: {fahrenheit_temperatures}")
 ```
 
+Lucid: That should do it!
