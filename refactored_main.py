@@ -9,6 +9,9 @@ import asyncio
 import json
 import re
 import numpy as np
+
+os.environ['TRANSFORMERS_OFFLINE']="1"
+
 import transformers
 import rich
 import websockets
@@ -61,15 +64,17 @@ class ServerHandler():
         self.read_mails = []
         self.unread_mails = []
     async def keep_collecting_mailbox(self):
-            #await self.send_information({"type": "command", "command_type":"collect_mailbox"})
+            
             while True:
+                logging.info(f"Checking for new mails")
+                await self.send_information({"type": "command", "command_type":"collect_mailbox"})
                 new_mails = await self.server_websocket.recv()
                 new_mails = json.loads(new_mails)
                 logging.info(f"Got: {new_mails}")
                 if new_mails != []:
                     logging.info(f"Got new mails: {new_mails}")
                     self.unread_mails.extend(new_mails)      
-                asyncio.sleep(0.1)  
+                await asyncio.sleep(0.1)  
                 
     async def connect(self):
         self.server_websocket = await websockets.connect(self.uri)
@@ -77,6 +82,7 @@ class ServerHandler():
     
     async def send_information(self, information: dict):
         await self.server_websocket.send(json.dumps(information))
+        await asyncio.sleep(0.1)
     
     async def send_discord_message(self, message: str):
         await self.send_information({"type": "Lucid_output", "output_type":"discord_message","content": message})
@@ -309,6 +315,7 @@ Tools:
         ```
         """
         prompt = self.format_prompt(chat_mode=True)
+        logging.info(f"Prompt: {prompt}\n<END OF PROMPT>")
 
         result = self.generate_one(prompt, stop=self.stop_conditions)
         self.chat_history = (prompt + result).strip()
@@ -467,14 +474,10 @@ Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data,
 server_handler = ServerHandler(host=host, port=port)
 
 
-
-async def main():
+async def Lucid_logic():
     global server_handler, Lucid_council, Lucid_memory
-    # Start the loop
     last_mail = None
     last_get_mail_time = 0
-    await server_handler.connect()
-    asyncio.create_task(server_handler.keep_collecting_mailbox())
     while True:
         if time.time()-last_get_mail_time >= 0.5:
             last_get_mail_time = time.time()
@@ -493,5 +496,19 @@ async def main():
         #logging.info(f"Chatting with the council")
         Lucid_council.chat()
         logging.info(f"{Lucid_council.chat_history}")
-        # time.sleep(0.2)
+        await asyncio.sleep(0.1)
+
+async def main():
+    global server_handler, Lucid_council, Lucid_memory
+    # Start the loop
+
+    await server_handler.connect()
+    
+    mail_box_collecting_task = asyncio.create_task(server_handler.keep_collecting_mailbox())
+    Lucid_logic_task = asyncio.create_task(Lucid_logic())
+    
+    await asyncio.gather(mail_box_collecting_task, Lucid_logic_task)
+
+    if mail_box_collecting_task.cancelled():
+            raise Exception("Mail box collecting task has been cancelled for some god forsaken reason.")
 asyncio.run(main())

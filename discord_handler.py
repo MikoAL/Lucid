@@ -62,6 +62,7 @@ class DiscordConnectionManager:
         self.server_websocket = await websockets.connect(server_ws_uri)
 
     async def send_to_server(self, message):
+        print("Sending message to server:", message)
         await self.server_websocket.send(json.dumps(message))
 
     async def receive_from_server(self):
@@ -109,7 +110,9 @@ async def on_message(message):
         return
     if message.channel.id == Lucid_channel_id:
         # This function will be called whenever a message is sent in the specified channel
+        print(f"New message in Lucid channel: {message.content}")
         if message.author != bot.user:
+            print(f"Received message from {message.author.name}: {message.content}")
             formatted_message = {'content': message.content, 'source': message.author.name, 'timestamp': time.time(), 'type': 'discord_user_message'}
             await discord_connection_manager.send_to_server(formatted_message)
 

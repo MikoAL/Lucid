@@ -6,7 +6,7 @@ from typing import List
 import logging
 import json
 import time
-
+import asyncio
 app = FastAPI()
 # Configure logger
 logging.basicConfig(level=logging.DEBUG)
@@ -50,8 +50,8 @@ class ServerConnectionManager:
         await self.mainscript_websocket.send_text(json.dumps(information))        
     
     async def log_to_discord(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(json.dumps({"type": "log", "content": message}))
+        logger.info(f"Logging message: {message}")
+        await self.discord_handler_websocket.send_text(json.dumps({"type": "log", "content": message}))
     async def send_discord_message(self, message: str):
         await self.discord_handler_websocket.send_text(json.dumps({"type": "Lucid_discord_message", "content": message}))
     
@@ -60,19 +60,20 @@ manager = ServerConnectionManager()
 
 @app.websocket("/ws/discord_handler")
 async def discord_handler_endpoint(websocket: WebSocket):
+    global uncollected_mails
     await manager.connect_discord_handler(websocket)
     try:
         while True:
             message = await manager.discord_handler_websocket.receive_text()
-            logger.info(f"Received message: {message}")
+            logger.info(f"Received message from discord handler: {message}")
             data = json.loads(message)
             message_type = data.get("type")
             content = data.get("content")
             match message_type:
                 case "discord_user_message":
                     message = {'content':content,'source':data.get('source'),'timestamp':data.get('timestamp'), 'type':'discord_user_message'}
-                    await manager.send_to_mainscript(message)
-                    
+                    uncollected_mails.append(message)
+                    logger.info(f"Added message to mailbox: {message}")
 
     except (WebSocketDisconnect, ConnectionClosed):
         manager.disconnect(websocket)
@@ -95,7 +96,8 @@ async def main_script_endpoint(websocket: WebSocket):
                         
                         case "collect_mailbox":
                             global uncollected_mails
-                            manager.send_personal_message(json.dumps(uncollected_mails), websocket)
+                            logger.info(f"Asked to for mailbox to be collected")
+                            await manager.send_personal_message(json.dumps(uncollected_mails), websocket)
                             uncollected_mails = []
 
                         case "log":
@@ -108,8 +110,9 @@ async def main_script_endpoint(websocket: WebSocket):
                     match data.get("output_type"):
                         case "discord_message":
                             # Handle summary output
-                            manager.send_discord_message(content)
+                            await manager.send_discord_message(content)
                             # Log the content...
+
 
     except (WebSocketDisconnect, ConnectionClosed) as e:
         logger.info(f"main_script has disconnected because of {e}")
