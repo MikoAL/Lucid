@@ -68,7 +68,9 @@ class ServerHandler():
             while True:
                 logging.info(f"Checking for new mails")
                 await self.send_information({"type": "command", "command_type":"collect_mailbox"})
+                logging.info(f"Sent command to collect mailbox, now waiting for response.")
                 new_mails = await self.server_websocket.recv()
+                logging.info(f"Got response from server: {new_mails}")
                 new_mails = json.loads(new_mails)
                 logging.info(f"Got: {new_mails}")
                 if new_mails != []:
@@ -486,9 +488,11 @@ async def Lucid_logic():
             logging.info(f"Got new mails: {new_mails}")
             for mail in new_mails:
                 # Format the mail
-                logging.info(f"Got mail: {mail}")
+                logging.info(f"Lucid Logic Got mail: {mail}")
                 match mail['type']:
-                    case "discord_message":
+                    case "discord_user_message":
+                        #logging.info(f"Got a discord message from {mail['source']}: {mail['content']}")
+                        #logging.info(f"Adding System message to the council")
                         Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
         else:
             if Lucid_council.chat_history is None:

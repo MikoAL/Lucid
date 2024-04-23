@@ -97,7 +97,9 @@ async def main_script_endpoint(websocket: WebSocket):
                         case "collect_mailbox":
                             global uncollected_mails
                             logger.info(f"Asked to for mailbox to be collected")
-                            await manager.send_personal_message(json.dumps(uncollected_mails), websocket)
+                            logger.info(f"{json.dumps(uncollected_mails)}")
+                            await websocket.send_text(json.dumps(uncollected_mails))
+                            logger.info(f"Mailbox collected")
                             uncollected_mails = []
 
                         case "log":
