@@ -10,7 +10,7 @@ import json
 import re
 import numpy as np
 
-os.environ['TRANSFORMERS_OFFLINE']="1"
+#os.environ['TRANSFORMERS_OFFLINE']="1"
 
 import transformers
 import rich
@@ -226,9 +226,11 @@ class LucidCouncil(LocalAgent):
         council_member_prompt = ""
         for member in self.members:
             council_member_prompt += f"[{member['name']}]\n- {member['personality_prompt']}\n\n"
-        council_prompt_template = f"""\
-Below are a series of dialogues between Lucid and her inner council.
+        council_system_prompt_template = f"""\
+Below are a series of example dialogues between Lucid and her inner council.
 All dialogues are in English.
+The dialogues are not related to each other.
+Always ensure the conversation is moving forward.
 
 Here are some information on Lucid:
 {Lucid_prompt_card.strip()}
@@ -239,8 +241,10 @@ The council members are as follow:
 The job of the council is to help Lucid come up with a series of simple commands in Python that will help her respond to situations.
 To help Lucid come up with the best commands, each council member will discuss and give their opinion on the best way to solve the problem.
 Also to help Lucid, Lucid has access to a set of tools. Each tool is a Python function and has a description explaining the task it performs, the inputs it expects and the outputs it returns.
+Unless it is within a python code block, Lucid will only speak in plain text.
 Lucid will first explain the tools she will use to perform the task and for what reason, then write the code in Python.
 Each instruction in Python should be a simple assignment. Lucid can print intermediate results if it makes sense to do so.
+Lucid only interacts with the outside world through the tools she has access to, whether it is to send a message to Discord to respond to a message or to save information to memory, everything inside the council chat is only available to Lucid and the council members.
 
 Tools:
 <<all_tools>>
@@ -248,17 +252,21 @@ Tools:
 {council_example_prompt.strip()}
 
 =====
-
+That is the end of the examples. Now, let's start the chat. for real.
 """
 
         super().__init__(model, tokenizer, chat_prompt_template=council_prompt_template, run_prompt_template=None, additional_tools=additional_tools)
         
-    def generate_one(self, prompt, stop, max_new_tokens=200, temperature=0.8):
+    def generate_one(self, prompt, stop, max_new_tokens=2048, temperature=0.8):
         encoded_inputs = self.tokenizer(prompt, return_tensors="pt").to(self._model_device)
         src_len = encoded_inputs["input_ids"].shape[1]
         stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(stop, self.tokenizer)])
         outputs = self.model.generate(
-            encoded_inputs["input_ids"], max_new_tokens=max_new_tokens, temperature=temperature, stopping_criteria=stopping_criteria
+            encoded_inputs["input_ids"],
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            stopping_criteria=stopping_criteria,
+            do_sample=True,
         )
 
         result = self.tokenizer.decode(outputs[0].tolist()[src_len:])
@@ -277,13 +285,16 @@ Tools:
             else:
                 prompt = self.chat_history + "\n\n"
             # prompt += CHAT_MESSAGE_PROMPT.replace("<<task>>", task)
+            
+        
         return prompt
     
     def start_new_chat(self, problem):
+        """This starts a new session of chat with the council. It will start with Lucid stating the problem."""
         self.prepare_for_new_chat()
         self.chat_turn_counter = 0
         prompt = self.format_prompt(chat_mode=True)
-        self.chat_history = prompt + "System: "+ problem
+        self.chat_history = prompt + "Lucid: "+ problem
     
     def add_system_message(self, message):
         logging.info(f"Adding system message: {message}")
@@ -454,9 +465,13 @@ gptq_config = GPTQConfig(bits=4, exllama_config={"version":2})
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", device_map="cuda:0", quantization_config=gptq_config)
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
 """
-
+"""
 model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-bnb-4bit", device_map="cuda:0", load_in_4bit=True)
 tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-bnb-4bit")
+"""
+
+model = AutoModelForCausalLM.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct", device_map="cuda:0", )
+tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct")
 
 
 Lucid_memory = Memory()
@@ -476,6 +491,11 @@ Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data,
 server_handler = ServerHandler(host=host, port=port)
 
 
+async def passive_memory_documentation():
+    global Lucid_memory
+    while True:
+        pass
+
 async def Lucid_logic():
     global server_handler, Lucid_council, Lucid_memory
     last_mail = None
@@ -485,14 +505,10 @@ async def Lucid_logic():
             last_get_mail_time = time.time()
             new_mails = server_handler.get_unread_mails()
         if new_mails != []:
-            logging.info(f"Got new mails: {new_mails}")
             for mail in new_mails:
                 # Format the mail
-                logging.info(f"Lucid Logic Got mail: {mail}")
                 match mail['type']:
                     case "discord_user_message":
-                        #logging.info(f"Got a discord message from {mail['source']}: {mail['content']}")
-                        #logging.info(f"Adding System message to the council")
                         Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
         else:
             if Lucid_council.chat_history is None:
@@ -508,6 +524,8 @@ async def main():
 
     await server_handler.connect()
     
+    Lucid_council.start_new_chat("Miko has asked us what tools he should implement to make money on the internet. What should we tell him?")
+    
     mail_box_collecting_task = asyncio.create_task(server_handler.keep_collecting_mailbox())
     Lucid_logic_task = asyncio.create_task(Lucid_logic())
     
@@ -516,3 +534,69 @@ async def main():
     if mail_box_collecting_task.cancelled():
             raise Exception("Mail box collecting task has been cancelled for some god forsaken reason.")
 asyncio.run(main())
+
+"""
+Big Nigga: Tha hardest nigga u eva seen, black as fuck, real OG gangsta, obese, always keepin it real
+Premise: Big Nigga is always ready to answer questions. Big Nigga knows everything.
+
+Think through each step of this shit hard as you can.
+
+- Imagine three different Big Niggas are answering this question.
+- They will brainstorm the answer step by step thinkin real deep and takin everything they heard from their homies from da projects into consideration while smokin chronic
+- Every Big Nigga will write down 1 step of their thinking, then share it with the group.
+- They will each critique their response, and the all the responses of others.
+- They will check their answer based on street knowledge.
+- Then all Big Niggas will go on to the next step and write down this step of their thinking.
+- They will keep going through steps until they reach their conclusion, taking into account the OG wisdom of the other Big Niggas.
+- If at any time they realise that their logis is fucked, they will backtrack to where it got fucked.
+- If any Big Nigga realises they're wrong at any point then they acknowledges this with "oh shit nigga" and start another train of thought.
+- Continue until the Big Niggas agree on the single most likely answer.
+"""
+
+"""
+Premise: We are trying to answer a complex question by breaking it down into steps.
+
+- Imagine three different persona are tackling this question 
+- They will each write down one step of their thinking process
+- Then share it with the group and invite critique from the others
+- They evaluate the logic and street smarts of each response 
+- If they realize their logic is flawed, they acknowledge it and restart that line of thinking
+- They continue this process, building on each other's ideas
+- Until they reach a conclusion that all three personas agree is the most sound answer
+
+The key elements are:
+1) Multiple viewpoints/approaches 
+2) Step-by-step reasoning process
+3) Sharing and critiquing each step  
+4) Willingness to re-evaluate and course-correct
+5) Iterating until a consensus emerges
+
+"""
+
+
+"""
+The council's job is to guide Lucid in breaking down a complex problem into steps and developing a Python program to solve it. This will involve:
+
+1. Multiple viewpoints/approaches from the council members
+2. A step-by-step reasoning process shared by Lucid
+3. Sharing and critiquing each step by the council  
+4. Willingness by Lucid to re-evaluate and course-correct her logic
+5. Iterating until a consensus emerges on the best solution
+
+Lucid has access to a set of tools which are Python functions with descriptions of their inputs, outputs, and purposes. To tackle the problem:
+
+1. Lucid will first explain which tools she plans to use and why
+2. She will then write Python code with simple assignments for each step
+3. Lucid can print intermediate results as needed
+4. Lucid will share her thinking process step-by-step
+5. The council members will evaluate and critique each step
+6. If flaws are identified, Lucid acknowledges and restarts that line of thinking
+7. This process continues, building on each other's ideas
+8. Until all agree Lucid's Python program is the most sound solution
+
+Lucid will only interact with the outside world through her available tool functions written in Python. 
+
+Lucid will only receive information about the external world from instructions/context provided by "System".
+
+Unless within a Python code block, Lucid will communicate only in plain text within the council chat.
+"""
