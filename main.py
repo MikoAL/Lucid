@@ -1,24 +1,30 @@
 import time
 import sys
-import requests
+import httpx
 import yaml
 import os
 import logging
 from datetime import date
 import asyncio
 import json
-
+import re
 import numpy as np
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p')
+#os.environ['TRANSFORMERS_OFFLINE']="1"
+
+import transformers
+import rich
+import websockets
+transformers.utils.logging.disable_default_handler()
+from rich.logging import RichHandler
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%I:%M:%S %p', handlers=[RichHandler(rich_tracebacks=True)])
 #logging.disable()
 # Get the absolute path of the script's directory
 script_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the working directory to the script's directory
 os.chdir(script_dir)
 
-
-# ============================ #
+# ===== ===== ===== #
 # Settings
 
 # Reading from a YAML file
@@ -28,138 +34,14 @@ with open('settings.yaml', 'r') as file:
 host = settings['host']
 port = settings['port']
 server = f'http://{host}:{port}'
+
+"""
 small_lm_name = settings['small_lm_settings']['language_model']
 small_lm_temperature = settings['small_lm_settings']['temperature']
 small_lm_top_k = settings['small_lm_settings']['top_k']
 small_lm_top_p = settings['small_lm_settings']['top_p']
-
-oobabooga_api_host = settings['oobabooga_api']['host']
-oobabooga_api_port = settings['oobabooga_api']['port']
-main_lm_temperature = settings['main_lm_settings']['temperature']
-oobabooga_api_server = f'http://{oobabooga_api_host}:{oobabooga_api_port}'
-
-logging.info('\n'.join([f"\nHost: {host}",
-			  f"Port: {port}",
-			  f"Server: {server}",
-			  f"Small Language Model: {small_lm_name}",
-			  f"Temperature: {small_lm_temperature}",
-			  f"Top K: {small_lm_top_k}",
-			  f"Top P: {small_lm_top_p}",
-			  ]))
-
-# ============================ #
-# Server stuff
-
-# Check if the server is up
-try:
-	response = requests.get(server)
-	response.raise_for_status()  # Raise an error for bad responses (4xx or 5xx)
-	logging.info(f"Server response: {response.status_code}")
-except requests.exceptions.RequestException as e:
-	logging.critical(f'Failed to connect to the server')
-	exit()
-
-def get_mail(server=server): # mail format {'content':content,'source':source,'timestamp':timestamp, 'type':type}
-	new_mail = (requests.get(url = f"{server}/mailbox")).json()
-	return new_mail
-
-def send_output(output, server=server):
-	logging.debug(f"Sending output: {output}")
-	requests.post(url=f"{server}/output",json=output)   
-
-def send_summary(summary, server=server):
-	requests.post(url=f"{server}/discord/post_summary",json=summary)
- 
- 
-# ============================ #
-# Oobabooga API stuff
-def api_encode_text(text: str):
-	json = {
-		"text": text,
-	}
-	response = requests.post(url=f"{oobabooga_api_server}/v1/internal/encode", json=json).json()
-	return response["tokens"]
-
-def api_decode_tokens(tokens: list):
-	json = {
-		"tokens": tokens,
-	}
-	response = requests.post(url=f"{oobabooga_api_server}/v1/internal/decode", json=json).json()
-	print(json)
-	print(response)
-	return response["text"]
-	
-
-def api_generate_response(prompt: str,
-						  temperature: float = 0.7,
-						  max_tokens: int = 200,
-						  top_k: int = 20,
-						  top_p: float = 1.0,
-						  logit_bias: dict = {},
-						  stop: list = ["\n"],):
-	json = {
-		"prompt": prompt,
-		"temperature": temperature,
-		"max_tokens": max_tokens,
-		"top_k": top_k,
-		"top_p": top_p,
-		"logit_bias": logit_bias, # e.g. {"personality": 2.0}
-		"stop": stop,
-	}
-	return ((requests.post(url=f"{oobabooga_api_server}/v1/completions", json=json)).json())['choices'][0]['text']
-
-def api_select(prompt, options, temperature, top_k, top_p):
-    if not options:
-        return None  # Handle the case of empty options list
-    options = [option.strip() for option in options]
-    tokenized_options = [api_encode_text(option) for option in options]
-    answer = ""
-    round_number = 1
-    while len(tokenized_options) > 1:  # Use > instead of != to ensure termination
-        round_number += 1
-        all_first_tokens = [option[0] for option in tokenized_options]
-        tokens_to_options = {}
-        for i in range(len(all_first_tokens)):
-            if all_first_tokens[i] not in tokens_to_options:
-                tokens_to_options[all_first_tokens[i]] = [tokenized_options[i]]
-            else:
-                tokens_to_options[all_first_tokens[i]].append(tokenized_options[i])
-        logit_bias = {}
-        for tokens_for_check in tokens_to_options:
-            logit_bias[tokens_for_check] = 100
-
-        response = api_generate_response(prompt=prompt, temperature=temperature, top_k=top_k, top_p=top_p, logit_bias=logit_bias, max_tokens=1)
-        response_token = api_encode_text(response)
-        response_token = response_token[-1]
-        prompt += response
-        answer += response
-        if response_token in tokens_to_options.keys():
-            for i in tokens_to_options[response_token]:
-                if len(i) == 0:
-                    break
-            tokenized_options = [i[1:] for i in tokens_to_options[response_token]]
-
-            
-        else:
-            # Handle the case where the response token is not found among the options
-            break  # Exit the loop to avoid potential infinite loop
-        # decode the final tokenized answer
-    for i in options:
-        if i.startswith(answer.strip()):
-            answer = i
-            break
-    return answer
-
-
-# ============================ #
 """
-Guidance stuff
-"""
-
-
-from guidance import models, select, gen
-import guidance
-small_lm = models.Transformers(small_lm_name, device_map="cuda", echo=False, trust_remote_code=True)
+device_for_tools = "cuda:1" #settings['device_for_tools']
 
 prompt_path = r".\Prompts"
 
@@ -167,604 +49,517 @@ with open(f"{prompt_path}\Lucid_prompt_card.txt", 'r', encoding='utf-8') as f:
 	Lucid_prompt_card = f.read()
 with open(f"{prompt_path}\Lucid_example_dialogue.txt", 'r', encoding='utf-8') as f:
 	Lucid_example_dialogue = f.read()
- 
-Lucid_small_lm = small_lm + "[System]\nYou are Lucid, here are some info on Lucid.\n"+Lucid_prompt_card
 
-# conversation format {'source':source,'content':content/message,'timestamp':timestamp}
-conversation=[]
-working_memory = []
-def get_conversation(conversation=conversation, retrieval_amount=8):
-	if len(conversation) == 0:
-		return 'No Record Yet.'
-	else:
-		prompt = ''
-		if len(conversation) < retrieval_amount:
-			for i in range(len(conversation)):
-				prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
-		else:
-			start_index = max(len(conversation) - retrieval_amount, 0)
-			for i in range(start_index, len(conversation)):
-				prompt += f"[{date.fromtimestamp(conversation[i]['timestamp'])}] {conversation[i]['source']}: {conversation[i]['content']}\n"
-		return prompt.strip()
+with open(f"{prompt_path}\council_example_prompt.txt", 'r', encoding='utf-8') as f:
+	council_example_prompt = f.read()
+# Load council members' data from JSON file
+with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
+	AI_Council_data = json.load(f)
+# ===== ===== ===== #
+# Server Handler
+class ServerHandler():
+    def __init__(self, host, port):
+        self.uri = f"ws://{host}:{port}/ws/main_script"
+        self.server_websocket = None
+        self.read_mails = []
+        self.unread_mails = []
+    async def keep_collecting_mailbox(self):
+            
+            while True:
+                logging.info(f"Checking for new mails")
+                await self.send_information({"type": "command", "command_type":"collect_mailbox"})
+                logging.info(f"Sent command to collect mailbox, now waiting for response.")
+                new_mails = await self.server_websocket.recv()
+                logging.info(f"Got response from server: {new_mails}")
+                new_mails = json.loads(new_mails)
+                logging.info(f"Got: {new_mails}")
+                if new_mails != []:
+                    logging.info(f"Got new mails: {new_mails}")
+                    self.unread_mails.extend(new_mails)      
+                await asyncio.sleep(0.1)  
+                
+    async def connect(self):
+        self.server_websocket = await websockets.connect(self.uri)
+        await self.send_information({"type": "log", "content": "main_script connected?"})
+    
+    async def send_information(self, information: dict):
+        await self.server_websocket.send(json.dumps(information))
+        await asyncio.sleep(0.1)
+    
+    async def send_discord_message(self, message: str):
+        await self.send_information({"type": "Lucid_output", "output_type":"discord_message","content": message})
+    
+    def get_unread_mails(self)->list:
+        temp_unread_mails = self.unread_mails.copy()
+        self.read_mails.extend(self.unread_mails)
+        self.unread_mails = []
+        return temp_unread_mails
+    
 
-# A summary of all current event, to hopefully shorten the required conversation length
-summary = 'Not Available'
-
-def write_summary(conversation=conversation, previous_summary=summary):
-	conversation_ = get_conversation(conversation=conversation)
-	new_line = '\n'
-	prompt = f"""\
-[Task]
-Provide a concise summary of the given conversation. Focus on key details and relevant information. A new line is used to denote the end of a summary.
-
-[Example]
-PREVIOUS SUMMARY:
-Person1 and Person2 are both in the same bar, sitting next to each other, when Person1 noticed his keys were gone.
-
-CONVERSATION:
-Person1: Excuse me, did you see a set of keys? 
-Person2: What kind of keys? 
-Person1: Five keys and a small foot ornament. 
-Person2: What a shame! I didn't see them. 
-Person1: Well, can you help me look for it? That's my first time here. 
-
-SUMMARY:
-Person1 is looking for a set of keys and seeks Person2's assistance in finding them. Person2 expresses regret for not having seen the keys and is willing to help in the search.
-
-[OUTPUT]
-PREVIOUS SUMMARY:
-{previous_summary}
-
-CONVERSATION:
-{conversation_}
-
-SUMMARY:
-"""
-	response = api_generate_response(prompt=prompt, temperature=main_lm_temperature, max_tokens=200, stop=["\n"])
-	return response
-#{gen(name='summary', max_tokens=200, temperature=small_lm_temperature, top_p=small_lm_top_p, stop=new_line)}
-def update_summary() -> None:
-	global summary
-	global summaries
-	summary = write_summary(conversation=conversation, previous_summary=summary)
-	summaries.append(summary)
-	logging.debug(f"Generated summary:\n{summary}")
-	send_summary({'content':summary})
-
-# the main tasks, defaults to be a good assistant to Miko or something like that.
-tasks = []
-def get_tasks(tasks=tasks) -> str:
-	if len(tasks)==0:
-		return '- Be a good friend to Miko.'
-	else:
-		prompt = ''
-		for i in tasks:
-			prompt+=f'- {i}\n'
-		return prompt.strip()
-
-# This is for generating a response
-# @guidance(stateless=False)
-# def guidance_converse(lm, working_memory=working_memory):
-# 	new_line= "\n"
-# 	logging.debug(f"Conversation: {get_conversation()}")
-# 	prompt = f"""\
-# [Tasks]
-# {get_tasks()}
-
-# [Working Memory]
-# {working_memory}
-
-# [Summary Of Previous Conversation]
-# {summary}
-
-# [Conversation]
-# {get_conversation()}
-
-# [Output]
-# Lucid: {gen(name='response', stop=new_line, temperature=small_lm_temperature, top_p=small_lm_top_p)}"""
-# 	temp_lm = lm + prompt
-# 	#response = temp_lm['response']
-# 	return temp_lm
-# def converse(Lucid_lm=Lucid_small_lm) -> str:
-# 	temp_lm = Lucid_lm + guidance_converse()
-# 	return temp_lm['response']
-
-# ============================ #
+# ===== ===== ===== #
 # Chroma stuff
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer, CrossEncoder
-cross_encoder = CrossEncoder("cross-encoder/stsb-distilroberta-base", device="cuda")
-sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-chromadb_client = chromadb.Client(Settings(anonymized_telemetry=False))
-short_term_memory = chromadb_client.create_collection("short_term_memory")
-short_term_memory_uid = 1
-#client = chromadb.PersistentClient(path="./Chroma")
 
 """
+
 This is what a Info Block should look like
 {
   'object_type' : 'entity',
   'object_name' : 'Miko',
   'content' : 'Miko like Nintendo games.',
-  'timestamp' : '2021-10-15 17:37:00',
+  'timestamp' : a float number,
   'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32),
+}
+
+This is what an unprocessed Info Block should look like
+{
+    'content' : 'Miko like Nintendo games.',
+    'timestamp' : a float number,
+    'vector': array([[-4.39221077e-02, -1.25277145e-02,  2.93133650e-02,]], dtype=float32),
 }    
 """
-# load Long-term memory from file
-# WIP
 
+class Memory():
+    
+    def __init__(self, device_for_tools=device_for_tools):
+        import chromadb
+        from chromadb.config import Settings
+        from sentence_transformers import SentenceTransformer, CrossEncoder
+        self.cross_encoder = CrossEncoder("cross-encoder/stsb-distilroberta-base", device=device_for_tools)
+        self.sentence_transformer = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device=device_for_tools)
+        self.chromadb_client = chromadb.Client(Settings(anonymized_telemetry=False))
+        self.short_term_memory_chroma_collection = self.chromadb_client.create_collection("short_term_memory")
+        self.short_term_memory_uid = 1
 
-@guidance(stateless=False)
-def guidance_make_new_info_block(lm, passage):
-	first_curly = "{"
-	second_curly = "}"
-	lm += """\
-This is what a Info Block should look like from an example:
-[Example]
-[2024/02/16] Lucid: What are you doing now? Stop ignoring me!
-[2024/02/16] Miko: I'm playing Nintendo games.
-[2024/02/16] Lucid: And that's a higher priority than me?
-[2024/02/16] Miko: ...
-[2024/02/16] Lucid: Your silence speaks volumes.
+        self.working_memory = []
+    
+    def check_for_similar_memories(self, unprocessed_info_block: dict, threshold: float = 0.8) -> list: # NOTE: This is an arbitrary threshold
+        """The function checks if a simular info block is already in the memory. If it is, it returns the ID of the similar info block.
+        If not, it returns an empty list."""
+        query_result = self.short_term_memory_chroma_collection.query(
+            query_embeddings=[unprocessed_info_block['vector']],    
+            n_results=4
+        )
+        sentence_combinations = [[unprocessed_info_block['content'], sentence] for sentence in query_result["documents"]]
+        scores = self.cross_encoder.predict(sentence_combinations)
+        ranked_indices = np.argsort(scores)[::-1]
+        # Get the original IDs for scores above the threshold
+        high_score_ids = [query_result["ids"][i] for i in ranked_indices if scores[i] >= threshold]
+        return high_score_ids
+            
+    def process_unprocessed_info_block(self, unprocessed_info_block: dict):
+        # TODO: Implement a processing for the unprocessed info block
+        pass    
+    
+    def without_keys(d, keys):
+        return {k: v for k, v in d.items() if k not in keys}
 
-```json
-{
-  "object_type" : 'entity',
-  "object_name" : 'Miko',
-  "content" : 'Miko likes Nintendo games.',
-}
-```
-[End of Example]
-"""
-	lm += f"""\
-{passage}
-```json
-{first_curly}
-  "object_type" : '{select(['entity','event'], name="object_type")},
-  "object_name" : "{gen(stop='"',name = "object_name", temperature=small_lm_temperature,  top_p=small_lm_top_p)},
-  "content" : "{gen(stop='"',name="content", temperature=small_lm_temperature,  top_p=small_lm_top_p)},"""  
-	return lm
+    
+    def display_working_memory(self) -> str:
+        if len(self.working_memory) == 0:
+            return "\n# Working Memory\nEmpty"
+        else:
+            working_memory_str = "\n# Working Memory\n"
+            for i in range(len(self.working_memory)):
+                working_memory_str += f"{i+1}. {self.working_memory[i]['content']}\n"
+            return working_memory_str
+    
+    def add_working_memory(self, information: str) -> None:
+        unprocessed_info_block = {
+            'content' : information,
+            'timestamp' : time.time(),
+            'vector': self.sentence_transformer.encode(information)
+        }
+        doubles = self.check_for_similar_memories(unprocessed_info_block)
+        if len(doubles) == 0:
+            self.working_memory.append(unprocessed_info_block)
+        else:
+            pass
+    def delete_working_memory(self, line_number:int) -> None:
+        """Deleting is kind of misleading. It actually moves the memory to short term memory. 
+        But calling it moving to short term memory is also confusing."""
+        moved_memory = self.working_memory.pop(line_number-1)
+        self.add_to_short_term_memory(moved_memory)
+        
+    def clear_working_memory(self):
+        for i in range(len(self.working_memory)):
+            self.delete_working_memory(1)
+    
+    def add_to_short_term_memory(self, unprocessed_info_block: dict):
+        info_block = self.process_unprocessed_info_block(unprocessed_info_block)
+        info_block_no_vector = self.without_keys(info_block, ['vector'])
+        self.short_term_memory_chroma_collection.add(
+            ids=[self.short_term_memory_uid],
+            documents=[info_block],
+            embeddings=[info_block['vector']],
+            metadata=[info_block_no_vector],
+        )
+        self.short_term_memory_uid += 1
+        
+# ===== ===== ===== #
+# Lucid Agents
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, Tool, pipeline
+class LucidAgent(LocalAgent):
+        def __init__(self, model, tokenizer, chat_prompt_template=None, run_prompt_template=None, additional_tools=None):
+            
+            
+            super().__init__(model = model,
+                             tokenizer = tokenizer,
+                             chat_prompt_template = chat_prompt_template,
+                             run_prompt_template = run_prompt_template,
+                             additional_tools = additional_tools)
 
-def make_new_info_block(clean_lm, passage):
-  lm = clean_lm + guidance_make_new_info_block(passage)
-  timestamp = date.fromtimestamp(time.time())
-  info_block ={
-  "object_type" : lm['object_type'],
-  "object_name" : lm['object_name'],
-  "content" : lm['content'],
-  "timestamp" : timestamp,
-  "vector" : sentence_transformer.encode([lm['content']]),
-  }
-  return info_block
+# ===== ===== ===== #
+# Lucid Council
 
-@guidance(stateless=False)
-def guidance_generate_fake_answer(lm, query):
-	new_line = '\n'
-	prompt = f"""\
-[System]
-You are a helpful assistant. Provide an example answer to the given question.
+from transformers.tools.agents import resolve_tools, evaluate, get_tool_creation_code, StopSequenceCriteria
+from transformers.generation import StoppingCriteriaList
 
-[Example]
-Question: "What is the capital of France?"
-Answer: "The capital of France is Paris."
+class LucidCouncil(LocalAgent):
+    def __init__(self, model, tokenizer, members: dict, additional_tools=None, council_example_prompt=council_example_prompt):
+        self.members = members
+        stop_conditions = ["\n\n", "=====", "System:", "Miko:", "```md\n# Working Memory", "<|im_start|>", "<|im_end|>","<|endoftext|>"]
+        #for member in self.members:
+        #    stop_conditions.append(f"{member['name']}:")
+        self.stop_conditions = stop_conditions
+        self.chat_turn_counter = 0
+        council_member_prompt = ""
+        for member in self.members:
+            council_member_prompt += f"[{member['name']}]\n- {member['personality_prompt']}\n\n"
+        council_system_prompt_template = f"""\
+Below are a series of example dialogues between Lucid and her inner council.
+All dialogues are in English.
+The dialogues are not related to each other.
+Always ensure the conversation is moving forward.
 
-Question: "Can you give me an example of a renewable energy source?"
-Answer: "One example of a renewable energy source is solar power, which harnesses energy from the sun."
+Here are some information on Lucid:
+{Lucid_prompt_card.strip()}
 
-Question: "Who wrote the play 'Romeo and Juliet'?"
-Answer: "The play 'Romeo and Juliet' was written by William Shakespeare."
-[End of Example]
-
-Question: "{query}"
-Answer: "{gen(name='Answer',max_tokens=200, stop=new_line, temperature=small_lm_temperature, top_p=small_lm_top_p)}"""
-	lm += prompt
-	return lm
-def generate_fake_answer(clean_lm, query) -> str:
-	temp_lm = clean_lm + guidance_generate_fake_answer(query)
-	return ('"'+temp_lm['Answer']).strip('"')
-@guidance(stateless=False)
-def guidance_check_for_new_info(lm, conversation = conversation, working_memory = working_memory):
-	new_line = '\n'
-	working_memory_prompt = ""
-	if len(working_memory) == 0:
-		working_memory_prompt = 'No Record Yet.'
-	else:
-		prompt = ''
-		if len(working_memory) != 0:
-			for i in working_memory:
-				prompt+=f'- {i["content"]}\n'
-			working_memory_prompt = prompt.strip()
-	temp_lm = lm + f"""\
-[System]
-You are a helpful assistant. You specialize in checking if there is any new information in the conversation that is not in working memory.
-
-[Example]
-
-[Example Working Memory]
-- Person 1 is going to the store.
-
-[Example Conversation]
-[2023/06/23] Person1: I'm going to the store.
-[2023/06/23] Person2: What are you going to buy?
-[2023/06/23] Person1: I'm going to buy some apples and oranges.
-[2023/06/23] Person2: I heard that the store has a sale on bananas today.
-
-[Example Checking for New Information]
-Is there any new information that I should know about?
-Yes.
-- There is a sale on bananas at the store in 2023/06/23 according to Person2.
-
-[End of Example]
-
-[Working Memory]
-{working_memory_prompt}
-
-[Conversation]
-{get_conversation(conversation=conversation)}
-
-[Output]
-Is there any new information that I should know about?
-"""
-	temp_lm += select(['Yes','No'], name="Yes_or_No")
-	return temp_lm
-
-async def check_for_new_info(clean_lm = small_lm, conversation = conversation, working_memory = working_memory) -> bool:
-	temp_lm = clean_lm+guidance_check_for_new_info(conversation=conversation, working_memory=working_memory)
-	if temp_lm['Yes_or_No'] == 'No':
-		return False
-	else:
-		return True
-async def get_new_info(conversation = conversation, working_memory = working_memory):
-	working_memory_prompt = ""
-	if len(working_memory) == 0:
-		working_memory_prompt = 'No Record Yet.'
-	else:
-		prompt = ''
-		if len(working_memory) != 0:
-			for i in working_memory:
-				prompt+=f'- {i["content"]}\n'
-			working_memory_prompt = prompt.strip()
-	prompt = f"""\
-[System]
-You are a helpful assistant. You specialize in checking if there is any new information in the conversation that is not in working memory.
-
-[Example]
-
-[Example Working Memory]
-- Person 1 is going to the store.
-
-[Example Conversation]
-[2023/06/23] Person1: I'm going to the store.
-[2023/06/23] Person2: What are you going to buy?
-[2023/06/23] Person1: I'm going to buy some apples and oranges.
-[2023/06/23] Person2: I heard that the store has a sale on bananas today.
-
-[Example Checking for New Information]
-Is there any new information that I should know about?
-Yes.
-- There is a sale on bananas at the store in 2023/06/23 according to Person2.
-
-[End of Example]
-
-[Working Memory]
-{working_memory_prompt}
-
-[Conversation]
-{get_conversation(conversation=conversation)}
-
-[Output]
-Is there any new information that I should know about?
-Yes.
-- """
-	response = api_generate_response(prompt=prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\n"])
-	return response
-def get_working_memory(working_memory=working_memory) -> str:
-	if len(working_memory) == 0:
-		return 'No Record Yet.'
-	else:
-		prompt = ''
-		for i in working_memory:
-			prompt+=f'- {i["content"]}\n'
-		return prompt.strip()
-
-
-def without_keys(d, keys):
-	return {k: v for k, v in d.items() if k not in keys}
-
-async def push_info_block_to_short_term_memory(info_block) ->bool:
-	global short_term_memory
-	global short_term_memory_uid
-	info_block_no_vector = without_keys(info_block, ['vector'])
-	short_term_memory.add(
-		ids=[short_term_memory_uid],
-		documents=[info_block],
-		embeddings=[info_block['vector']],
-		metadata=[info_block_no_vector],
-	)
-	short_term_memory_uid += 1
-	return True # TODO This value should represent if it was accepted or not, but I haven't implemented that yet lol
-# Chroma stuff end
-# ============================ #
-# Temp TTS stuff
-"""
-from RealtimeTTS import TextToAudioStream, SystemEngine
-
-engine = SystemEngine() # replace with your TTS engine
-stream = TextToAudioStream(engine)
-#stream.feed("Hello world! How are you today?")
-#stream.play_async()
-def play_audio(text):
-	stream.feed(text)
-	stream.play_async()
-# Temp TTS stuff end
-"""
-# ============================ #
-# AI Council
-# Yes this is copied from "Left Brain, Right Brain" - Bo Burnham
-"""
-We have a task based structure for Lucid!
-The most important task is called:
-"Thinking"
-
-Thinking is done by three characters:
-- Lumi: Lucid's Left brain
-- Reverie: Lucid's Right brain
-- Lucid: The main decider
-
-I call this "Council of Thought" or something like that, the names are all WIP.
-They will be incharge of giving out tasks to the small LMs and the main LM.
-
-Potential idea:
-The council will work on a voting system.
-All members must cast a vote, and the majority vote will be the final decision.
-Incases where there are more than two options, and no majority is reached, Lucid's vote will take priority.
-
-
-"""
-# Load council members' data from JSON file
-with open(f"{prompt_path}\Council_Members.json", 'r', encoding='utf-8') as f:
-	AI_Council_data = json.load(f)
-
-def council_of_thought(current_situation: str) -> str:
-	global AI_Council_data, Lucid_prompt_card
- 
-	# Generate prompt for each council member
-	council_member_prompt = ""
-	for member in AI_Council_data:
-		council_member_prompt += f"[{member['name']}]\n- {member['personality_prompt']}\n\n"
-  
-	council_prompt = f"""[System]\nYou are Lucid, here are some info on Lucid.
-{Lucid_prompt_card}
-
-The following are Lucid's internal thoughts. Each member has a unique perspective and role in Lucid's decision-making process.
+The council members are as follow:
 {council_member_prompt.strip()}
 
-In discussions, each council member will provide their input based on the situation and their unique perspective. At the end of the discussion, Lucid will make the final decision based on the council's input.
+The job of the council is to help Lucid come up with a series of simple commands in Python that will help her respond to situations.
+To help Lucid come up with the best commands, each council member will discuss and give their opinion on the best way to solve the problem.
+Also to help Lucid, Lucid has access to a set of tools. Each tool is a Python function and has a description explaining the task it performs, the inputs it expects and the outputs it returns.
+Unless it is within a python code block, Lucid will only speak in plain text.
+Lucid will first explain the tools she will use to perform the task and for what reason, then write the code in Python.
+Each instruction in Python should be a simple assignment. Lucid can print intermediate results if it makes sense to do so.
+Lucid only interacts with the outside world through the tools she has access to, whether it is to send a message to Discord to respond to a message or to save information to memory, everything inside the council chat is only available to Lucid and the council members.
 
-Below is an example conversation between Lucid and its council members.
+Tools:
+<<all_tools>>
 
-[Example]
-### Situation:
-[2023/07/23] Lucid: Miko, it seems you're struggling with your code again.
-[2023/07/23] Miko: Yeah, I can't seem to find the bug. It's driving me crazy.
-### Council Discussion:
-Reverie: Maybe he needs a break to clear his mind.
-Lumi: Or perhaps we can review the code together to identify the issue.
-Lucid: Okay, let's see if we can find the bug together.
-[End of Example]
+{council_example_prompt.strip()}
 
-### Situation:
-{current_situation}
-### Council Discussion:
+=====
+That is the end of the examples. Now, let's start the chat. for real.
 """
-	before_Lucid = api_generate_response(prompt=council_prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\nLucid:"])
-	council_prompt += before_Lucid + "\nLucid:"
-	Lucid_verdict = api_generate_response(prompt=council_prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\n"])
-	
-	return (before_Lucid + "\nLucid:" +Lucid_verdict).strip()
 
-# ============================ #
-# Main LM
+        super().__init__(model, tokenizer, chat_prompt_template=council_prompt_template, run_prompt_template=None, additional_tools=additional_tools)
+        
+    def generate_one(self, prompt, stop, max_new_tokens=2048, temperature=0.8):
+        encoded_inputs = self.tokenizer(prompt, return_tensors="pt").to(self._model_device)
+        src_len = encoded_inputs["input_ids"].shape[1]
+        stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(stop, self.tokenizer)])
+        outputs = self.model.generate(
+            encoded_inputs["input_ids"],
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            stopping_criteria=stopping_criteria,
+            do_sample=True,
+        )
 
-def main_lm_converse() -> str:
-	global summary, Lucid_prompt_card, Lucid_example_dialogue
-	prompt = f"""\
-[System]
-You are Lucid, here are some info on Lucid.
-{Lucid_prompt_card}
-{Lucid_example_dialogue}
-Lucid only responds in plain text.
-Lucid only has knowledge of the tasks, working memory, coverstations summaries and internal discussions, she does not make stuff up.
-Respond to the conversation as Lucid, stay in character.
+        result = self.tokenizer.decode(outputs[0].tolist()[src_len:])
+        # Inference API returns the stop sequence
+        for stop_seq in stop:
+            if result.endswith(stop_seq):
+                result = result[: -len(stop_seq)]
+        return result.strip()
+    
+    def format_prompt(self, chat_mode=False):
+        # TODO: Actually implement the chat mode
+        description = "\n".join([f"- {name}: {tool.description}" for name, tool in self.toolbox.items()])
+        if chat_mode:
+            if self.chat_history is None:
+                prompt = self.chat_prompt_template.replace("<<all_tools>>", description) + "\n\n"
+            else:
+                prompt = self.chat_history + "\n\n"
+            # prompt += CHAT_MESSAGE_PROMPT.replace("<<task>>", task)
+            
+        
+        return prompt
+    
+    def start_new_chat(self, problem):
+        """This starts a new session of chat with the council. It will start with Lucid stating the problem."""
+        self.prepare_for_new_chat()
+        self.chat_turn_counter = 0
+        prompt = self.format_prompt(chat_mode=True)
+        self.chat_history = prompt + "Lucid: "+ problem
+    
+    def add_system_message(self, message):
+        logging.info(f"Adding system message: {message}")
+        if self.chat_turn_counter != 0:
+            self.chat_history += "\n\nSystem: "+ message
+        else:
+            self.start_new_chat(message)
+            
+    def chat(self, *, return_code=False, remote=False, **kwargs):
+        """
+        Sends a new request to the council in a chat. Will use the previous ones in its history.
 
-[Tasks]
-{get_tasks()}
+        Args:
+            task (`str`): The task to perform
+            return_code (`bool`, *optional*, defaults to `False`):
+                Whether to just return code and not evaluate it.
+            remote (`bool`, *optional*, defaults to `False`):
+                Whether or not to use remote tools (inference endpoints) instead of local ones.
+            kwargs (additional keyword arguments, *optional*):
+                Any keyword argument to send to the agent when evaluating the code.
 
-[Working Memory]
-{get_working_memory()}
+        Example:
 
-[Summary Of Previous Conversation]
-{summary}
+        ```py
+        from transformers import HfAgent
 
-[Internal Discussions]
+        agent = HfAgent("https://api-inference.huggingface.co/models/bigcode/starcoder")
+        agent.chat("Draw me a picture of rivers and lakes")
 
-[Conversation]
-{get_conversation()}
+        agent.chat("Transform the picture so that there is a rock in there")
+        ```
+        """
+        prompt = self.format_prompt(chat_mode=True)
+        logging.info(f"Prompt: {prompt}\n<END OF PROMPT>")
 
-[Output]
-Lucid: """
-	response = api_generate_response(prompt=prompt, temperature=main_lm_temperature, max_tokens=300, stop=["\n"])
-	return response
+        result = self.generate_one(prompt, stop=self.stop_conditions)
+        self.chat_history = (prompt + result).strip()
+        self.chat_turn_counter += 1
+        explanation, code = self.clean_code_for_chat(result)
 
-# ============================ #
-last_get_mail_time= 0
-new_mail = []
-times_without_summary = 0
-summaries = []
-summaries_cross_encoder_result = []
+        self.log(f"==Response from the agent==\n{result}") 
 
-small_lm_tasks = []
-main_lm_tasks = []
+        if code is not None:
+            self.log(f"\n\n==Code generated by the agent==\n{code}")
+            if not return_code:
+                self.log("\n\n==Result==")
+                self.cached_tools = resolve_tools(code, self.toolbox, remote=remote, cached_tools=self.cached_tools)
+                self.chat_state.update(kwargs)
+                return evaluate(code, self.cached_tools, self.chat_state, chat_mode=True)
+            else:
+                tool_code = get_tool_creation_code(code, self.toolbox, remote=remote)
+                return f"{tool_code}\n{code}"
+            
+
+            
+    def clean_code_for_chat(self, result):
+        """Extracts the explanation and code sections from a string."""
+        start_marker = "```python"
+        end_marker = "```"
+        
+        # Find the start and end indices of the code section
+        start_idx = result.find(start_marker)
+        if start_idx == -1:
+            return None, None  # No code section found
+        start_idx += len(start_marker) + 1  # Move past the marker and newline
+        end_idx = result.find(end_marker, start_idx)
+        if end_idx == -1:
+            return None, None  # No closing marker found
+        
+        # Extract the code section
+        code_section = result[start_idx:end_idx].strip()
+        
+        # Extract the explanation section
+        explanation_end_idx = result.rfind("\n", 0, start_idx)
+        explanation = result[:explanation_end_idx].strip()
+        
+        return explanation, code_section
+
+        """ This is the old version of the code that I am replacing
+        
+        lines = result.split("\n")
+        idx = 0
+        while idx < len(lines) and not lines[idx].lstrip().startswith("```"):
+            idx += 1
+        explanation = "\n".join(lines[:idx]).strip()
+        if idx == len(lines):
+            return explanation, None
+
+        idx += 1
+        start_idx = idx
+        while not lines[idx].lstrip().startswith("```"):
+            idx += 1
+        code = "\n".join(lines[start_idx:idx]).strip()
+
+        return explanation, code"""
+    def run(self):
+        raise NotImplementedError("The council does not have a run method. It is only for chatting.")
+
+# Council Tools
+class send_discord_message(Tool):
+    name = "send_discord_message"
+    description = "Sends a message to the discord server"
+    inputs = ["text"]
+    outputs = []
+    
+    def __call__(self, message):
+        logging.info(f"Sending message to discord: {message}")
+        asyncio.create_task(server_handler.send_discord_message(message))
+
+class recall_memory(Tool):
+    name = "recall_memory"
+    description = "Tries to find a related memory from the past"
+    inputs = ["text"]
+    outputs = ["text"]
+    
+    def __call__(self, text):
+        # TODO: Implement a memory system
+        memory = "I don't have any memory of that."
+        return memory
+
+class save_information(Tool):
+    name = "save_information"
+    description = "Saves information to memory to be used later."
+    inputs = ["text"]
+    outputs = []
+    
+    def __call__(self, information):
+        # TODO: Implement a memory system
+        pass
+
+class write_to_working_memory(Tool):
+    name = "write_to_working_memory"
+    description = "Writes information to working_memory to be used later."
+    inputs = ["text"]
+    outputs = []
+    
+    def __call__(self, information):
+        Lucid_memory.add_working_memory(information)
+        pass
+
+class print_to_council(Tool):
+    name = "print_to_council"
+    description = "Prints into the council chat as System."
+    inputs = ["string"]
+    outputs = ["text"]
+    
+    def __call__(self, text):
+        Lucid_council.add_system_message(f"[result of print_to_council() from python code] {text}")
+        return text
+
+class get_working_memory(Tool):
+    name = "get_working_memory"
+    description = "Returns the current working memory."
+    inputs = []
+    outputs = ["text"]
+    
+    def __call__(self):
+        return Lucid_memory.display_working_memory()
+
+
+# ===== ===== ===== #
+# Load the model and tokenizer
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, Tool, pipeline
+
 """
-A task structure so we can split work more easily
-
-small_lm will handle the following tasks:
-- Summarize the conversation
-- Generate a fake answer
-- Check for new information
-- Generate a new information block
-
-main_lm will handle the following tasks:
-- Generate a response
-- Thinking
-
-task_names
-- Summarize Conversation
-- Generate Fake Answer
-- Check for New Information
-- Generate New Information Block
-- Generate Response
-
-importance
-Goes from 0 to inf, 0 being the least important and inf being the most important
-
-{
-	"task_name": "Summarize Conversation",
-	"importance": 1,
-}
-
+gptq_config = GPTQConfig(bits=4, exllama_config={"version":2})
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", device_map="cuda:0", quantization_config=gptq_config)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
 """
-def importance_sorting(tasks: list) -> list:
-	"""
-	Sorting the tasks based on importance
-	"""
-	sorted_task_list = sorted(tasks, key=lambda x: x['importance'])
-	return sorted_task_list
+"""
+model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-bnb-4bit", device_map="cuda:0", load_in_4bit=True)
+tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-bnb-4bit")
+"""
 
-async def small_lm_loop() -> None:
-	"""Each loop will handle ONE task from the small_lm_tasks list"""
-	global small_lm_tasks
-	if len(small_lm_tasks) == 0:
-		await asyncio.sleep(0.1)
-		return
-	
-	small_lm_tasks = importance_sorting(small_lm_tasks)
-	current_task = small_lm_tasks.pop(0)
-	logging.debug(f"Executing Task: {current_task}")
-	match current_task['task_name']:
-		case "Summarize Conversation":
-			update_summary()
+model = AutoModelForCausalLM.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct", device_map="cuda:0", )
+tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct")
 
-		case "Check for New Information":
-			new_info_check = await check_for_new_info()
-			if new_info_check == False:
-				logging.debug("No new information.")
-			else:
-				new_info = await get_new_info()
-				new_info_block = make_new_info_block(clean_lm=small_lm, passage=(get_conversation() + "\n\n" + new_info))
-				accepted = push_info_block_to_short_term_memory(new_info_block)
-				if accepted:
-					working_memory.append(new_info_block)
 
-		case _:
-			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
-	return
+Lucid_memory = Memory()
 
-async def main_lm_loop() -> None:
-	"""Each loop will handle ONE task from the main_lm_tasks list"""
-	global main_lm_tasks
-	if len(main_lm_tasks) == 0:
-		await asyncio.sleep(0.1)
-		return
+send_discord_message_tool = send_discord_message()
+print_to_council_tool = print_to_council()
+get_working_memory_tool = get_working_memory()
 
-	main_lm_tasks = importance_sorting(main_lm_tasks)
-	current_task = main_lm_tasks.pop(0)
-	logging.debug(f"Executing Task: {current_task}")
-	match current_task['task_name']:
-		case "Generate Response":
-			logging.debug('generating response')
-			generated_response = main_lm_converse()
-			response = {
-				'source': 'Lucid',
-				'content': generated_response,
-				'timestamp': time.time(),
-				'type': 'conversation',
-			}
-			logging.debug(f"generated response:\n{generated_response}")
-			conversation.append(response)
-			send_output(output=response)
-   
-		case "Generate Thought":
-			logging.debug('generating thought')
-			pass
+# Create the Lucid Council
+Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data, 
+                             additional_tools=[
+                                 send_discord_message_tool,
+                                 print_to_council_tool,
+                                 get_working_memory_tool,
+                                 ])
 
-		case _:
-			logging.error(f"Unknown task name: {current_task['task_name']}\nSKIPPING {current_task['task_name']}")
-	return
+server_handler = ServerHandler(host=host, port=port)
 
-async def handle_mail() -> None:
-	global new_mail, small_lm_tasks, main_lm_tasks
-	global last_get_mail_time
-	if time.time()-last_get_mail_time >= 0.5:
-		last_get_mail_time = time.time()
-		new_mail.extend(get_mail())
 
-	if len(new_mail) != 0:
-		logging.debug(f"New mail: {new_mail}")
-		mail_ = new_mail.pop(0)
-		match mail_['type']:
-			case 'conversation':
-				conversation.append(mail_)
-				logging.debug(f'Got mail: {mail_}')
-			case _:
-				tmp_mail_type = mail_['type']
-				logging.warning(f'Received mail with unknown type \"{tmp_mail_type}\"\n{mail_}')
-				pass
+async def passive_memory_documentation():
+    global Lucid_memory
+    while True:
+        pass
 
-		main_lm_tasks.append({'task_name': 'Generate Response', 'importance': 10})
-		logging.debug('Added Generate Response task to main_lm_tasks')
-		small_lm_tasks.append({'task_name': 'Check for New Information', 'importance': 5})
-		logging.debug('Added Check for New Information task to small_lm_tasks')
-		await asyncio.sleep(0.1)
-	else:
-		await asyncio.sleep(0.1)
-	return
+async def Lucid_logic():
+    global server_handler, Lucid_council, Lucid_memory
+    last_mail = None
+    last_get_mail_time = 0
+    while True:
+        if time.time()-last_get_mail_time >= 0.5:
+            last_get_mail_time = time.time()
+            new_mails = server_handler.get_unread_mails()
+        if new_mails != []:
+            for mail in new_mails:
+                # Format the mail
+                match mail['type']:
+                    case "discord_user_message":
+                        Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
+        else:
+            if Lucid_council.chat_history is None:
+                Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
+        #logging.info(f"Chatting with the council")
+        Lucid_council.chat()
+        logging.info(f"{Lucid_council.chat_history}")
+        await asyncio.sleep(0.1)
 
-async def main() -> None:
-	global small_lm_tasks, main_lm_tasks
-	small_lm_task = asyncio.create_task(small_lm_loop())
-	main_lm_task = asyncio.create_task(main_lm_loop())
-	handle_mail_task = asyncio.create_task(handle_mail())
-	
-	send_output(output={'content':"```md\n#=====#\n\nLucid is ONLINE\n\n#=====#\n```",'source':'system','timestamp':time.time(),'type':'conversation'})
-	new_line = '\n- '
-	
-	# Keep looping tasks individually
-	while True:
-	 
-		if small_lm_task.done():
-			logging.debug('small_lm_task done. Restarting...')
-			small_lm_task = asyncio.create_task(small_lm_loop())
-   
-			if len(small_lm_tasks) != 0:
-				logging.debug(f"small_lm_tasks: {new_line.join((task['task_name'] for task in small_lm_tasks))}")
-	
-	
-		if main_lm_task.done():
-			logging.debug('main_lm_task done. Restarting...')
-			main_lm_task = asyncio.create_task(main_lm_loop())
-   
-			if len(main_lm_tasks) != 0:
-				logging.debug(f"main_lm_tasks: {new_line.join((task['task_name'] for task in main_lm_tasks))}")
-			else:
-				logging.debug('main_lm_tasks empty\n Adding Generate Thought task')
-				
-	
-		if handle_mail_task.done():
-			handle_mail_task = asyncio.create_task(handle_mail())
+async def main():
+    global server_handler, Lucid_council, Lucid_memory
+    # Start the loop
 
-		await asyncio.sleep(0.1)
+    await server_handler.connect()
+    
+    Lucid_council.start_new_chat("Miko has asked us what tools he should implement to make money on the internet. What should we tell him?")
+    
+    mail_box_collecting_task = asyncio.create_task(server_handler.keep_collecting_mailbox())
+    Lucid_logic_task = asyncio.create_task(Lucid_logic())
+    
+    await asyncio.gather(mail_box_collecting_task, Lucid_logic_task)
 
+    if mail_box_collecting_task.cancelled():
+            raise Exception("Mail box collecting task has been cancelled for some god forsaken reason.")
 asyncio.run(main())
 
+# ===== ===== ===== #
+
+"""
+The council's job is to guide Lucid in breaking down a complex problem into steps and developing a Python program to solve it. This will involve:
+
+1. Multiple viewpoints/approaches from the council members
+2. A step-by-step reasoning process shared by Lucid
+3. Sharing and critiquing each step by the council  
+4. Willingness by Lucid to re-evaluate and course-correct her logic
+5. Iterating until a consensus emerges on the best solution
+
+Lucid has access to a set of tools which are Python functions with descriptions of their inputs, outputs, and purposes. To tackle the problem:
+
+1. Lucid will first explain which tools she plans to use and why
+2. She will then write Python code with simple assignments for each step
+3. Lucid can print intermediate results as needed
+4. Lucid will share her thinking process step-by-step
+5. The council members will evaluate and critique each step
+6. If flaws are identified, Lucid acknowledges and restarts that line of thinking
+7. This process continues, building on each other's ideas
+8. Until all agree Lucid's Python program is the most sound solution
+
+Lucid will only interact with the outside world through her available tool functions written in Python. 
+
+Lucid will only receive information about the external world from instructions/context provided by "System".
+
+Unless within a Python code block, Lucid will communicate only in plain text within the council chat.
+"""
