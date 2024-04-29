@@ -78,6 +78,15 @@ async def discord_handler_endpoint(websocket: WebSocket):
     except (WebSocketDisconnect, ConnectionClosed):
         manager.disconnect(websocket)
         logger.info(f"discord_handler has disconnected")
+        logger.info(f"Attempting to reconnect discord_handler...")
+        while True:
+            try:
+                await manager.connect_discord_handler(websocket)
+                break
+            except Exception as e:
+                logger.info(f"Reconnection failed because of {e}")
+                await asyncio.sleep(5)
+                continue
 
 @app.websocket("/ws/main_script")
 async def main_script_endpoint(websocket: WebSocket):
@@ -119,4 +128,12 @@ async def main_script_endpoint(websocket: WebSocket):
     except (WebSocketDisconnect, ConnectionClosed) as e:
         logger.info(f"main_script has disconnected because of {e}")
         manager.disconnect(websocket)
-        await manager.log_to_discord(f"main_script has disconnected because of {e}")
+        await manager.log_to_discord("attempting to reconnect main_script...")
+        while True:
+            try:
+                await manager.connect_mainscript(websocket)
+                break
+            except Exception as e:
+                logger.info(f"Reconnection failed because of {e}")
+                await asyncio.sleep(5)
+                continue

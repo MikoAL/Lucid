@@ -63,21 +63,7 @@ class ServerHandler():
         self.server_websocket = None
         self.read_mails = []
         self.unread_mails = []
-    async def keep_collecting_mailbox(self):
-            
-            while True:
-                logging.info(f"Checking for new mails")
-                await self.send_information({"type": "command", "command_type":"collect_mailbox"})
-                logging.info(f"Sent command to collect mailbox, now waiting for response.")
-                new_mails = await self.server_websocket.recv()
-                logging.info(f"Got response from server: {new_mails}")
-                new_mails = json.loads(new_mails)
-                logging.info(f"Got: {new_mails}")
-                if new_mails != []:
-                    logging.info(f"Got new mails: {new_mails}")
-                    self.unread_mails.extend(new_mails)      
-                await asyncio.sleep(0.1)  
-                
+
     async def connect(self):
         self.server_websocket = await websockets.connect(self.uri)
         await self.send_information({"type": "log", "content": "main_script connected?"})
@@ -213,12 +199,84 @@ class LucidAgent(LocalAgent):
 # Lucid Council
 
 from transformers.tools.agents import resolve_tools, evaluate, get_tool_creation_code, StopSequenceCriteria
+import transformers.tools.agents
 from transformers.generation import StoppingCriteriaList
+
+
+# We do this so that the default tools are not initialized
+transformers.tools.agents._tools_are_initialized = True
+
+    
+def select(prompt, options, model, tokenizer, does_the_model_add_a_token_before_generating=True):
+    if not options:
+        return None  # Handle the case of empty options list
+    options = [option.strip() for option in options]
+    if does_the_model_add_a_token_before_generating:
+        tokenized_options = [tokenizer(option, return_tensors="pt").to("cuda:0")["input_ids"].tolist()[0][1:] for option in options]
+    else:
+        tokenized_options = [tokenizer(option, return_tensors="pt").to("cuda:0")["input_ids"].tolist()[0] for option in options]
+    full_tokenized_options = tokenized_options.copy()
+    #print(tokenized_options)
+    round_number = 0
+    answer = []
+    while len(tokenized_options) > 1:  # Use > instead of != to ensure termination
+        round_number += 1
+        #print(f"round number: {round_number}")
+        #print(f"tokenized options: {tokenized_options}")
+        all_first_tokens = [option[0] for option in tokenized_options]
+        #print(f"all first tokens: {all_first_tokens}")
+        tokens_to_options = {}
+        for i in range(len(all_first_tokens)):
+            if all_first_tokens[i] not in tokens_to_options:
+                tokens_to_options[all_first_tokens[i]] = [tokenized_options[i]]
+            else:
+                tokens_to_options[all_first_tokens[i]].append(tokenized_options[i])
+        logit_bias = {}
+        for tokens_for_check in tokens_to_options:
+
+            logit_bias[tuple([tokens_for_check])] = 95.0
+        encoded_inputs = tokenizer(prompt, return_tensors="pt").to("cuda:0")
+        src_len = encoded_inputs["input_ids"].shape[1]
+        #print(logit_bias)
+        response = model.generate(
+            encoded_inputs["input_ids"],
+            max_new_tokens=3,
+            temperature=0.0,
+            sequence_bias=logit_bias,
+            renormalize_logits = True,
+            output_scores = True,
+        )
+        #print(f"response: {response.tolist()}\nend of response")
+        response_token = response[0].tolist()[src_len:][0]
+        response_word = tokenizer.decode(response_token)
+        #print(f"response word: {response_word}")
+        prompt += response_word
+        answer.append(response_token)
+        #print(f"checking if {response_token} is in {tokens_to_options.keys()}")
+        if response_token in tokens_to_options.keys():
+            for i in tokens_to_options[response_token]:
+                #print(f"all options: {i}")
+                if len(i) == 0:
+                    break
+            tokenized_options = [i[1:] for i in tokens_to_options[response_token]]
+            #print(f"tokenized options: {tokenized_options}")
+
+
+        else:
+            # Handle the case where the response token is not found among the options
+            break  # Exit the loop to avoid potential infinite loop
+        # decode the final tokenized answer
+    for i in range(len(full_tokenized_options)):
+        if full_tokenized_options[i][:len(answer)] == answer:
+            answer_idx = i
+            break
+    return options[answer_idx]
 
 class LucidCouncil(LocalAgent):
     def __init__(self, model, tokenizer, members: dict, additional_tools=None, council_example_prompt=council_example_prompt):
         self.members = members
-        stop_conditions = ["\n\n", "=====", "System:", "Miko:", "```md\n# Working Memory", "<|im_start|>", "<|im_end|>","<|endoftext|>"]
+        self.tokenizer = tokenizer
+        stop_conditions = ["\n\n", "=====", "System:", "Miko:", "```md\n# Working Memory", "<|im_start|>", "<|im_end|>","<|endoftext|>","<|end_of_text|>","<|eot_id|>"]
         #for member in self.members:
         #    stop_conditions.append(f"{member['name']}:")
         self.stop_conditions = stop_conditions
@@ -226,38 +284,114 @@ class LucidCouncil(LocalAgent):
         council_member_prompt = ""
         for member in self.members:
             council_member_prompt += f"[{member['name']}]\n- {member['personality_prompt']}\n\n"
+            
+        the_word_summary_in_currly_brackets = "{summary}"
         council_system_prompt_template = f"""\
 Below are a series of example dialogues between Lucid and her inner council.
 All dialogues are in English.
-The dialogues are not related to each other.
 Always ensure the conversation is moving forward.
 
 Here are some information on Lucid:
 {Lucid_prompt_card.strip()}
 
-The council members are as follow:
+The council's job is to guide Lucid in breaking down a complex problem into steps and developing a Python program to solve it. This will involve:
+
+1. Multiple viewpoints/approaches from the council members
+2. A step-by-step reasoning process shared by Lucid
+3. Sharing and critiquing each step by the council  
+4. Willingness by Lucid to re-evaluate and course-correct her logic
+5. Iterating until a consensus emerges on the best solution
+
+Lucid has access to a set of tools which are Python functions with descriptions of their inputs, outputs, and purposes. To tackle the problem:
+
+1. Lucid will first explain which tools she plans to use and why
+2. She will then write Python code with simple assignments for each step
+3. Lucid can print intermediate results as needed
+4. Lucid will share her thinking process step-by-step
+5. The council members will evaluate and critique each step
+6. If flaws are identified, Lucid acknowledges and restarts that line of thinking
+7. This process continues, building on each other's ideas
+8. Until all agree Lucid's Python program is the most sound solution
+
+Lucid will only interact with the outside world through her available tool functions written in Python. 
+
+Lucid will only receive information about the external world from instructions/context provided by "System".
+
+Lucid can only talk to members in the current session.
+
+Lucid can only use the tools available to her in the current session.
+
+Unless within a Python code block, Lucid will communicate only in plain text within the council chat.
+
+All text in the council chat is considered part of the conversation, and will all be from Lucid, council members or System with no exceptions.
+
+Example of a council session:
+
+System: [Discord Message from user miko_al] Lucid, can you recommend some healthy snack ideas?
+
+Lucid: Miko has requested healthy snack recommendations. Let's discuss how to approach this, council.  
+
+Lumi: We could use the `web_search` tool to find reputable sources on nutritious snack options, then summarize the key points.
+
+Reverie: Personalizing the recommendations based on Miko's potential preferences or dietary needs would make them more actionable.
+
+Lucid: Those are excellent suggestions. I will query trusted sources for healthy snack ideas, summarize the findings, and tailor the recommendations for Miko if possible. Here is my plan:
+
+```python
+# Ask Miko about dietary preferences/restrictions
+send_discord_message(message="Do you have any specific dietary needs I should consider for the snack recommendations?")
+
+# Search Google for reliable healthy snack information
+snack_info = web_search(query="healthy snack ideas", num_results=5)
+
+# Summarize key points from search results
+summary = summarize(snack_info)
+```
+
+Lucid: Now, Let's wait for Miko's response before proceeding with the personalized recommendations.
+
+System: [Discord Message from user miko_al] I don't have any dietary restrictions. Just looking for some tasty but nutritious snack options!
+
+Lumi: Since Miko doesn't have dietary restrictions, we can proceed with the summary from the search results.
+
+System: [Web Search Results]
+1. 30 Healthy Snack Ideas - EatingWell
+Fruit and veggie snacks: Apple with peanut butter, carrot sticks with hummus, banana with almond butter, cucumber slices with tzatziki dip...
+2. 50 Super Healthy Snack Ideas - Cooking Light
+Nuts and seeds: Handful of almonds, pumpkin seeds, walnuts. Edamame with sea salt. Energy balls made with oats, nut butter and dried fruit...
+3. Healthy Snacks for Weight Loss - WebMD
+Greek yogurt with berries, hard boiled eggs, avocado toast on whole grain bread, dark chocolate and nuts, celery with cream cheese...
+4. Nutritious Snack Recipes - Mayo Clinic
+Baked apple chips, kale chips, energy bites with oats and peanut butter, roasted chickpeas, cottage cheese with fruit...
+5.Healthy Office Snacks - Fitbit Blog
+Fresh veggies like cherry tomatoes, snap peas with ranch. Whole grain crackers with turkey and cheese. Protein smoothie with greek yogurt and fruit...
+
+Lucid: Wonderful, these search results provide a diverse array of healthy snack ideas from reputable sources. Let me summarize the key points and send it to Miko.
+
+```python
+summary = "Here are some tasty and nutritious snack ideas:\n1. Fresh fruits and veggies like apples, bananas, carrot/cucumber sticks with dips like nut butters, hummus, tzatziki\n2. Nuts, seeds, edamame for protein and healthy fats\n3. Greek yogurt, cottage cheese paired with fruit or a bit of honey\n4. Whole grain crackers or bread with nut butters, cheese, turkey slices\n5. Energy bites made with oats, nut butters, dried fruit\n6. Air-fried veggie chips like kale chips or baked apple chips\n7. Hard boiled eggs for a protein boost\n8. A small amount of dark chocolate"
+
+send_discord_message(message=f"Here are some tasty and nutritious snack ideas for you:\n{the_word_summary_in_currly_brackets}")
+```
+
+Lumi: Looks good! The summary is concise and covers a variety of snack options.
+"""
+        Lucid_council_user_prompt = f"""\
+This session's members:
 {council_member_prompt.strip()}
 
-The job of the council is to help Lucid come up with a series of simple commands in Python that will help her respond to situations.
-To help Lucid come up with the best commands, each council member will discuss and give their opinion on the best way to solve the problem.
-Also to help Lucid, Lucid has access to a set of tools. Each tool is a Python function and has a description explaining the task it performs, the inputs it expects and the outputs it returns.
-Unless it is within a python code block, Lucid will only speak in plain text.
-Lucid will first explain the tools she will use to perform the task and for what reason, then write the code in Python.
-Each instruction in Python should be a simple assignment. Lucid can print intermediate results if it makes sense to do so.
-Lucid only interacts with the outside world through the tools she has access to, whether it is to send a message to Discord to respond to a message or to save information to memory, everything inside the council chat is only available to Lucid and the council members.
-
-Tools:
+This session's tools:
 <<all_tools>>
-
-{council_example_prompt.strip()}
-
-=====
-That is the end of the examples. Now, let's start the chat. for real.
 """
-
-        super().__init__(model, tokenizer, chat_prompt_template=council_prompt_template, run_prompt_template=None, additional_tools=additional_tools)
+        prompt_as_messages= [
+            {"role":"system", "content":council_system_prompt_template.strip()},
+            {"role":"user", "content":Lucid_council_user_prompt.strip()}
+        ]
+        Lucid_council_prompt = (self.tokenizer.apply_chat_template(prompt_as_messages, tokenize=False, add_generation_prompt=True)).strip()
+        super().__init__(model, tokenizer, chat_prompt_template=Lucid_council_prompt,run_prompt_template=None, additional_tools=additional_tools)
         
-    def generate_one(self, prompt, stop, max_new_tokens=2048, temperature=0.8):
+    def generate_one(self, prompt, stop, max_new_tokens=2048, temperature=0.4):
+        
         encoded_inputs = self.tokenizer(prompt, return_tensors="pt").to(self._model_device)
         src_len = encoded_inputs["input_ids"].shape[1]
         stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(stop, self.tokenizer)])
@@ -330,10 +464,27 @@ That is the end of the examples. Now, let's start the chat. for real.
         prompt = self.format_prompt(chat_mode=True)
         logging.info(f"Prompt: {prompt}\n<END OF PROMPT>")
 
-        result = self.generate_one(prompt, stop=self.stop_conditions)
+        
+        # Make sure the first few generated tokens are correct
+        acceptable_strings = ["Lucid: ", "```python"]
+        for name in self.members:
+            acceptable_strings.append(f"{name['name']}: ")
+        
+        print(f"Acceptable strings: {acceptable_strings}")
+
+        selected_word = select(prompt, acceptable_strings, self.model, self.tokenizer)
+
+        if selected_word == "```python":
+            prompt += selected_word + "\n"
+            result = self.generate_one(prompt, stop=["```"], max_new_tokens=2048)
+            explanation, code = self.clean_code_for_chat(selected_word+"\n"+result)
+        else:
+            prompt += selected_word
+            result = self.generate_one(prompt, stop=self.stop_conditions)
+            code = None
         self.chat_history = (prompt + result).strip()
         self.chat_turn_counter += 1
-        explanation, code = self.clean_code_for_chat(result)
+        
 
         self.log(f"==Response from the agent==\n{result}") 
 
@@ -396,13 +547,14 @@ That is the end of the examples. Now, let's start the chat. for real.
 # Council Tools
 class send_discord_message(Tool):
     name = "send_discord_message"
-    description = "Sends a message to the discord server"
+    description = "Sends a message to the discord server. Takes a string as input. Does not return anything."
     inputs = ["text"]
     outputs = []
     
     def __call__(self, message):
+        global server_commands
         logging.info(f"Sending message to discord: {message}")
-        asyncio.create_task(server_handler.send_discord_message(message))
+        server_commands.append({"command_type": "send_discord_message", "content": message})
 
 class recall_memory(Tool):
     name = "recall_memory"
@@ -427,7 +579,7 @@ class save_information(Tool):
 
 class write_to_working_memory(Tool):
     name = "write_to_working_memory"
-    description = "Writes information to working_memory to be used later."
+    description = "Writes information to working_memory to be used later. Takes a string as input."
     inputs = ["text"]
     outputs = []
     
@@ -437,59 +589,69 @@ class write_to_working_memory(Tool):
 
 class print_to_council(Tool):
     name = "print_to_council"
-    description = "Prints into the council chat as System."
-    inputs = ["string"]
+    description = "Prints into the council chat as System. Takes a string as input and returns it as output."
+    inputs = ["text"]
     outputs = ["text"]
     
     def __call__(self, text):
         Lucid_council.add_system_message(f"[result of print_to_council() from python code] {text}")
         return text
 
-class get_working_memory(Tool):
-    name = "get_working_memory"
-    description = "Returns the current working memory."
+class print_working_memory(Tool):
+    name = "print_working_memory"
+    description = "Prints the current working memory into the council chat. Takes no inputs."
     inputs = []
     outputs = ["text"]
     
     def __call__(self):
+        Lucid_council.add_system_message(f"[result of print_working_memory() from python code] {Lucid_memory.display_working_memory()}")
         return Lucid_memory.display_working_memory()
 
-
+class web_search(Tool):
+    name = "web_search"
+    description = "Searches the web for information. Takes a query and returns the top results."
+    inputs = ["text"]
+    outputs = ["text"]
+    
+    def __call__(self, query, num_results=5): 
+        pass
 # ===== ===== ===== #
 # Load the model and tokenizer
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, Tool, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, BitsAndBytesConfig, Tool, pipeline
 
 """
 gptq_config = GPTQConfig(bits=4, exllama_config={"version":2})
 model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", device_map="cuda:0", quantization_config=gptq_config)
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
 """
+
+bnb_config = BitsAndBytesConfig(load_in_4bit=True)
+model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", device_map="cuda:0", quantization_config=bnb_config)
+tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit")
+tokenizer_with_prefix_space = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", add_prefix_space=True)
 """
-model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-bnb-4bit", device_map="cuda:0", load_in_4bit=True)
-tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-bnb-4bit")
+gptq_config = GPTQConfig(bits=8, exllama_config={"version":1})
+model = AutoModelForCausalLM.from_pretrained("astronomer/Llama-3-8B-Instruct-GPTQ-8-Bit", device_map="cuda:0", quantization_config=gptq_config)
+tokenizer = AutoTokenizer.from_pretrained("astronomer/Llama-3-8B-Instruct-GPTQ-8-Bit")
+#model=model.bfloat16()
 """
-
-model = AutoModelForCausalLM.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct", device_map="cuda:0", )
-tokenizer = AutoTokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B-Instruct")
-
-
 Lucid_memory = Memory()
 
 send_discord_message_tool = send_discord_message()
 print_to_council_tool = print_to_council()
-get_working_memory_tool = get_working_memory()
+print_working_memory_tool = print_working_memory()
 
 # Create the Lucid Council
 Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data, 
                              additional_tools=[
                                  send_discord_message_tool,
                                  print_to_council_tool,
-                                 get_working_memory_tool,
+                                 print_working_memory_tool,
                                  ])
 
 server_handler = ServerHandler(host=host, port=port)
-
+server_commands = []
 
 async def passive_memory_documentation():
     global Lucid_memory
@@ -518,15 +680,42 @@ async def Lucid_logic():
         logging.info(f"{Lucid_council.chat_history}")
         await asyncio.sleep(0.1)
 
+async def server_logic():
+    global server_handler
+    global server_commands
+    while True:
+        logging.info(f"Server commands: {server_commands}")
+        if server_commands == []:
+            server_commands.append({"type": "command", "command_type":"collect_mailbox"})
+        current_command = server_commands.pop(0)
+        
+        match current_command['command_type']:
+            case "collect_mailbox":
+                logging.info(f"Collecting mailbox")
+                await server_handler.send_information({"type": "command", "command_type":"collect_mailbox"})
+                logging.info(f"Sent command to collect mailbox, now waiting for response.")
+                new_mails = await server_handler.server_websocket.recv()
+                logging.info(f"Got response from server: {new_mails}")
+                new_mails = json.loads(new_mails)
+                logging.info(f"Got: {new_mails}")
+                if new_mails != []:
+                    logging.info(f"Got new mails: {new_mails}")
+                    server_handler.unread_mails.extend(new_mails)
+            
+            case "send_discord_message":
+                await server_handler.send_discord_message(current_command['content'])
+        await asyncio.sleep(0.1)  
+        
+
 async def main():
     global server_handler, Lucid_council, Lucid_memory
     # Start the loop
 
     await server_handler.connect()
     
-    Lucid_council.start_new_chat("Miko has asked us what tools he should implement to make money on the internet. What should we tell him?")
+    Lucid_council.start_new_chat("Miko has asked us what tools he should implement that would enable me, Lucid, to make money on the internet. What should we tell him?")
     
-    mail_box_collecting_task = asyncio.create_task(server_handler.keep_collecting_mailbox())
+    mail_box_collecting_task = asyncio.create_task(server_logic())
     Lucid_logic_task = asyncio.create_task(Lucid_logic())
     
     await asyncio.gather(mail_box_collecting_task, Lucid_logic_task)
@@ -537,29 +726,3 @@ asyncio.run(main())
 
 # ===== ===== ===== #
 
-"""
-The council's job is to guide Lucid in breaking down a complex problem into steps and developing a Python program to solve it. This will involve:
-
-1. Multiple viewpoints/approaches from the council members
-2. A step-by-step reasoning process shared by Lucid
-3. Sharing and critiquing each step by the council  
-4. Willingness by Lucid to re-evaluate and course-correct her logic
-5. Iterating until a consensus emerges on the best solution
-
-Lucid has access to a set of tools which are Python functions with descriptions of their inputs, outputs, and purposes. To tackle the problem:
-
-1. Lucid will first explain which tools she plans to use and why
-2. She will then write Python code with simple assignments for each step
-3. Lucid can print intermediate results as needed
-4. Lucid will share her thinking process step-by-step
-5. The council members will evaluate and critique each step
-6. If flaws are identified, Lucid acknowledges and restarts that line of thinking
-7. This process continues, building on each other's ideas
-8. Until all agree Lucid's Python program is the most sound solution
-
-Lucid will only interact with the outside world through her available tool functions written in Python. 
-
-Lucid will only receive information about the external world from instructions/context provided by "System".
-
-Unless within a Python code block, Lucid will communicate only in plain text within the council chat.
-"""
