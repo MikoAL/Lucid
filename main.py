@@ -402,6 +402,7 @@ This session's tools:
             temperature=temperature,
             stopping_criteria=stopping_criteria,
             do_sample=True,
+            min_new_tokens=1,
         )
 
         result = self.tokenizer.decode(outputs[0].tolist()[src_len:])
@@ -644,7 +645,7 @@ print_to_council_tool = print_to_council()
 print_working_memory_tool = print_working_memory()
 
 # Create the Lucid Council
-Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data, 
+Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data[:-1], 
                              additional_tools=[
                                  send_discord_message_tool,
                                  print_to_council_tool,
