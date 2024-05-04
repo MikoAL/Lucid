@@ -1,5 +1,5 @@
 # Project Goal
-Make an AI Vtuber that can pass as human even after long periods of interactions.
+Make an AI that can pass as human even after long periods of interactions.
 
 ### Essential Systems
 - Thought Process [HARD]
