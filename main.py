@@ -9,7 +9,7 @@ import asyncio
 import json
 import re
 import numpy as np
-
+import random
 #os.environ['TRANSFORMERS_OFFLINE']="1"
 
 import transformers
@@ -242,10 +242,11 @@ def select(prompt, options, model, tokenizer, does_the_model_add_a_token_before_
         response = model.generate(
             encoded_inputs["input_ids"],
             max_new_tokens=3,
-            temperature=0.0,
+            temperature=0.85,
             sequence_bias=logit_bias,
             renormalize_logits = True,
             output_scores = True,
+            do_sample=True,
         )
         #print(f"response: {response.tolist()}\nend of response")
         response_token = response[0].tolist()[src_len:][0]
@@ -392,7 +393,7 @@ This session's tools:
         Lucid_council_prompt = (self.tokenizer.apply_chat_template(prompt_as_messages, tokenize=False, add_generation_prompt=True)).strip()
         super().__init__(model, tokenizer, chat_prompt_template=Lucid_council_prompt,run_prompt_template=None, additional_tools=additional_tools)
         
-    def generate_one(self, prompt, stop, max_new_tokens=2048, temperature=0.4):
+    def generate_one(self, prompt, stop, max_new_tokens=2048, temperature=0.85):
         
         encoded_inputs = self.tokenizer(prompt, return_tensors="pt").to(self._model_device)
         src_len = encoded_inputs["input_ids"].shape[1]
@@ -413,19 +414,44 @@ This session's tools:
                 result = result[: -len(stop_seq)]
         return result.strip()
     
-    def format_prompt(self, chat_mode=False):
+    def format_prompt(self, chat_mode=False, max_chat_history=10, wrapped_prompt=True):
         # TODO: Actually implement the chat mode
         description = "\n".join([f"- {name}: {tool.description}" for name, tool in self.toolbox.items()])
         if chat_mode:
             prompt = self.chat_prompt_template.replace("<<all_tools>>", description) + "\n\n"
-            if len(self.chat_history) >= 15:
-                self.chat_history = self.chat_history[-15:]
+            wrapable_prompt = []
+            if len(self.chat_history) >= max_chat_history:
+                self.chat_history = self.chat_history[-max_chat_history:]
+            
             if len(self.chat_history) > 0:
-                for i in self.chat_history:
-                    if i["role"] != "code":
-                        prompt += i["role"] + ": " + i["content"] + "\n\n"
+                if wrapped_prompt:
+                    for i in self.chat_history:    
+                        if i["role"] == "system":
+                            wrapable_prompt.append({"role":"system", "content":i["content"]})
+                        elif i["role"] == "code":
+                            wrapable_prompt.append({"role":"assistant", "content":i["content"]})
+                        else:
+                            wrapable_prompt.append({"role":"assistant", "content":f'{i["role"]}: {i["content"]}'})
+                    do_not_have_system = True
+                    if do_not_have_system:
+                        wrapable_prompt.insert(0, {"role":"user", "content":prompt})
                     else:
-                        prompt += i["content"] + "\n\n"
+                        wrapable_prompt.insert(0, {"role":"system", "content":prompt})
+                    logging.info(f"Wrapable prompt: {wrapable_prompt}")
+                    logging.info(f"Prompt: {self.tokenizer.apply_chat_template(wrapable_prompt, tokenize=False, add_generation_prompt=True)}")
+                    return self.tokenizer.apply_chat_template(wrapable_prompt, tokenize=False, add_generation_prompt=True)
+                else:
+                    for i in self.chat_history:
+                        if i["role"] == "code":
+                            prompt += i["content"] + "\n\n"
+                        else:
+                            prompt += i["role"] + ": " + i["content"] + "\n\n"
+                    return prompt
+            
+            
+
+            
+            
             # prompt += CHAT_MESSAGE_PROMPT.replace("<<task>>", task)
             
         
@@ -436,14 +462,14 @@ This session's tools:
         self.prepare_for_new_chat()
         self.chat_history = []
         self.chat_turn_counter = 0
-        self.add_system_message(f"Lucid has a new problem to solve: {problem}")
+        self.chat_history.append({"role":"Lucid", "content":problem})
+        #self.add_system_message(f"Lucid has a new problem to solve: {problem}")
     
     def add_system_message(self, message):
         logging.info(f"Adding system message: {message}")
-        if self.chat_turn_counter != 0:
-            self.chat_history.append({"role":"system", "content":message})
-        else:
-            self.start_new_chat(message)
+
+        self.chat_history.append({"role":"system", "content":message})
+
             
     def chat(self, *, return_code=False, remote=False, **kwargs):
         """
@@ -487,8 +513,10 @@ This session's tools:
             result = self.generate_one(prompt+selected_word, stop=["```"], max_new_tokens=2048) + "```"
             explanation, code = self.clean_code_for_chat(selected_word+"\n"+result)
         else:
+            acceptable_strings.remove("```python")
             prompt += selected_word
-            result = self.generate_one(prompt+selected_word, stop=self.stop_conditions)
+            #selected_word = acceptable_strings[random.randint(0, len(acceptable_strings)-1)]
+            result = self.generate_one(prompt+selected_word, stop=self.stop_conditions, max_new_tokens=128)
             code = None
         
         self.chat_turn_counter += 1
@@ -499,15 +527,17 @@ This session's tools:
         if code is not None:
             self.chat_history.append({"role":"code", "content":selected_word+"\n"+result})
             self.log(f"\n\n==Code generated by the agent==\n{code}")
-            if not return_code:
-                self.log("\n\n==Result==")
-                self.cached_tools = resolve_tools(code, self.toolbox, remote=remote, cached_tools=self.cached_tools)
-                self.chat_state.update(kwargs)
-                return evaluate(code, self.cached_tools, self.chat_state, chat_mode=True)
-            else:
-                tool_code = get_tool_creation_code(code, self.toolbox, remote=remote)
-                return f"{tool_code}\n{code}"
-            
+            try:
+                if not return_code:
+                    self.log("\n\n==Result==")
+                    self.cached_tools = resolve_tools(code, self.toolbox, remote=remote, cached_tools=self.cached_tools)
+                    self.chat_state.update(kwargs)
+                    return evaluate(code, self.cached_tools, self.chat_state, chat_mode=True)
+                else:
+                    tool_code = get_tool_creation_code(code, self.toolbox, remote=remote)
+                    return f"{tool_code}\n{code}"
+            except Exception as e:
+                self.chat_history.append({"role":"system", "content":f"An error occurred while evaluating the code: {e}"})
         else:
             self.chat_history.append({"role":selected_word[:-2], "content":result})
             
@@ -640,16 +670,24 @@ model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", 
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
 """
 
+"""
 bnb_config = BitsAndBytesConfig(load_in_4bit=True)
 model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", device_map="cuda:0", quantization_config=bnb_config)
 tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit")
 tokenizer_with_prefix_space = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", add_prefix_space=True)
+"""
+
 """
 gptq_config = GPTQConfig(bits=8, exllama_config={"version":1})
 model = AutoModelForCausalLM.from_pretrained("astronomer/Llama-3-8B-Instruct-GPTQ-8-Bit", device_map="cuda:0", quantization_config=gptq_config)
 tokenizer = AutoTokenizer.from_pretrained("astronomer/Llama-3-8B-Instruct-GPTQ-8-Bit")
 #model=model.bfloat16()
 """
+
+model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3-mini-128k-instruct", device_map="cuda:0", trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+
+
 Lucid_memory = Memory()
 
 send_discord_message_tool = send_discord_message()
@@ -672,7 +710,7 @@ async def passive_memory_documentation():
     while True:
         pass
 
-async def Lucid_logic():
+async def Lucid_council_logic():
     global server_handler, Lucid_council, Lucid_memory
     last_mail = None
     last_get_mail_time = 0
@@ -730,7 +768,7 @@ async def main():
     Lucid_council.start_new_chat("Miko has asked us what tools he should implement that would enable me, Lucid, to make money on the internet. What should we tell him?")
     
     mail_box_collecting_task = asyncio.create_task(server_logic())
-    Lucid_logic_task = asyncio.create_task(Lucid_logic())
+    Lucid_logic_task = asyncio.create_task(Lucid_council_logic())
     
     await asyncio.gather(mail_box_collecting_task, Lucid_logic_task)
 
