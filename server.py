@@ -137,3 +137,15 @@ async def main_script_endpoint(websocket: WebSocket):
                 logger.info(f"Reconnection failed because of {e}")
                 await asyncio.sleep(5)
                 continue
+            
+@app.websocket("/ws/voice_recognition")
+async def voice_recognition_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            message = {'content':data,'source':data.get('source'),'timestamp':data.get('timestamp'), 'type':'discord_user_message'}
+            await manager.broadcast(data)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        await manager.log_to_discord("voice_recognition has disconnected")

@@ -710,27 +710,33 @@ async def passive_memory_documentation():
     while True:
         pass
 
+stop_Lucid_council = False
+
 async def Lucid_council_logic():
-    global server_handler, Lucid_council, Lucid_memory
+    global server_handler, Lucid_council, Lucid_memory, stop_Lucid_council
+    stop_Lucid_council = False
     last_mail = None
     last_get_mail_time = 0
     while True:
-        if time.time()-last_get_mail_time >= 0.5:
-            last_get_mail_time = time.time()
-            new_mails = server_handler.get_unread_mails()
-        if new_mails != []:
-            for mail in new_mails:
-                # Format the mail
-                match mail['type']:
-                    case "discord_user_message":
-                        Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
+        if stop_Lucid_council != True:
+            if time.time()-last_get_mail_time >= 0.5:
+                last_get_mail_time = time.time()
+                new_mails = server_handler.get_unread_mails()
+            if new_mails != []:
+                for mail in new_mails:
+                    # Format the mail
+                    match mail['type']:
+                        case "discord_user_message":
+                            Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
+            else:
+                if Lucid_council.chat_history is None:
+                    Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
+            #logging.info(f"Chatting with the council")
+            Lucid_council.chat()
+            logging.info(f"{Lucid_council.chat_history}")
+            await asyncio.sleep(0.1)
         else:
-            if Lucid_council.chat_history is None:
-                Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
-        #logging.info(f"Chatting with the council")
-        Lucid_council.chat()
-        logging.info(f"{Lucid_council.chat_history}")
-        await asyncio.sleep(0.1)
+            break
 
 async def server_logic():
     global server_handler
