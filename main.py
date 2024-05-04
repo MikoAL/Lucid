@@ -10,6 +10,7 @@ import json
 import re
 import numpy as np
 import random
+import threading
 #os.environ['TRANSFORMERS_OFFLINE']="1"
 
 import transformers
@@ -712,75 +713,91 @@ async def passive_memory_documentation():
 
 stop_Lucid_council = False
 
-async def Lucid_council_logic():
+
+stop_Lucid_council = False
+
+def Lucid_council_logic():
     global server_handler, Lucid_council, Lucid_memory, stop_Lucid_council
+
     stop_Lucid_council = False
+
     last_mail = None
+
     last_get_mail_time = 0
+
     while True:
         if stop_Lucid_council != True:
-            if time.time()-last_get_mail_time >= 0.5:
+            if time.time() - last_get_mail_time >= 0.5:
                 last_get_mail_time = time.time()
                 new_mails = server_handler.get_unread_mails()
+
             if new_mails != []:
                 for mail in new_mails:
                     # Format the mail
                     match mail['type']:
                         case "discord_user_message":
                             Lucid_council.add_system_message(f"[Discord Message from user {mail['source']}] {mail['content']}")
+
             else:
                 if Lucid_council.chat_history is None:
                     Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
-            #logging.info(f"Chatting with the council")
+
+            # logging.info(f"Chatting with the council")
             Lucid_council.chat()
             logging.info(f"{Lucid_council.chat_history}")
-            await asyncio.sleep(0.1)
+
         else:
             break
 
-async def server_logic():
+def server_logic():
     global server_handler
     global server_commands
+
     while True:
         logging.info(f"Server commands: {server_commands}")
+
         if server_commands == []:
-            server_commands.append({"type": "command", "command_type":"collect_mailbox"})
+            server_commands.append({"type": "command", "command_type": "collect_mailbox"})
+
         current_command = server_commands.pop(0)
-        
+
         match current_command['command_type']:
             case "collect_mailbox":
                 logging.info(f"Collecting mailbox")
-                await server_handler.send_information({"type": "command", "command_type":"collect_mailbox"})
+                server_handler.send_information({"type": "command", "command_type": "collect_mailbox"})
                 logging.info(f"Sent command to collect mailbox, now waiting for response.")
-                new_mails = await server_handler.server_websocket.recv()
+                new_mails = server_handler.server_websocket.recv()
                 logging.info(f"Got response from server: {new_mails}")
                 new_mails = json.loads(new_mails)
                 logging.info(f"Got: {new_mails}")
+
                 if new_mails != []:
                     logging.info(f"Got new mails: {new_mails}")
                     server_handler.unread_mails.extend(new_mails)
-            
+
             case "send_discord_message":
-                await server_handler.send_discord_message(current_command['content'])
-        await asyncio.sleep(0.1)  
-        
+                server_handler.send_discord_message(current_command['content'])
 
-async def main():
+        time.sleep(0.1)
+
+def main():
     global server_handler, Lucid_council, Lucid_memory
+
     # Start the loop
-
-    await server_handler.connect()
-    
+    server_handler.connect()
     Lucid_council.start_new_chat("Miko has asked us what tools he should implement that would enable me, Lucid, to make money on the internet. What should we tell him?")
-    
-    mail_box_collecting_task = asyncio.create_task(server_logic())
-    Lucid_logic_task = asyncio.create_task(Lucid_council_logic())
-    
-    await asyncio.gather(mail_box_collecting_task, Lucid_logic_task)
 
-    if mail_box_collecting_task.cancelled():
-            raise Exception("Mail box collecting task has been cancelled for some god forsaken reason.")
-asyncio.run(main())
+    mail_box_collecting_thread = threading.Thread(target=server_logic)
+    Lucid_logic_thread = threading.Thread(target=Lucid_council_logic)
+
+    mail_box_collecting_thread.start()
+    Lucid_logic_thread.start()
+
+    mail_box_collecting_thread.join()
+    Lucid_logic_thread.join()
+
+if __name__ == "__main__":
+    main()
 
 # ===== ===== ===== #
 
