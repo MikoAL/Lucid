@@ -76,11 +76,15 @@ class ServerHandler():
     async def send_discord_message(self, message: str):
         await self.send_information({"type": "Lucid_output", "output_type":"discord_message","content": message})
     
-    def get_unread_mails(self)->list:
-        temp_unread_mails = self.unread_mails.copy()
-        self.read_mails.extend(self.unread_mails)
-        self.unread_mails = []
-        return temp_unread_mails
+    def get_unread_mails(self, wanted_mail_types: list = ['discord_user_message'])->list:
+        """The wanted_mail_types are the types of mails that you want to get. The rest will be left in the unread mails."""
+        result = []
+        for i in range(len(self.unread_mails)):
+            if self.unread_mails[i]['type'] in wanted_mail_types:
+                mail_read = self.unread_mails.pop(i)
+                result.append(mail_read)
+            self.read_mails.extend(result)
+        return result
     
 
 # ===== ===== ===== #
@@ -433,7 +437,7 @@ This session's tools:
                             wrapable_prompt.append({"role":"assistant", "content":i["content"]})
                         else:
                             wrapable_prompt.append({"role":"assistant", "content":f'{i["role"]}: {i["content"]}'})
-                    do_not_have_system = True
+                    do_not_have_system = False
                     if do_not_have_system:
                         wrapable_prompt.insert(0, {"role":"user", "content":prompt})
                     else:
@@ -660,6 +664,42 @@ class web_search(Tool):
     
     def __call__(self, query, num_results=5): 
         pass
+
+# ===== ===== ===== #
+# Utility functions
+
+# Single Turn Conversation
+
+def single_turn_conversation(prompt, model, tokenizer, max_length=256, temperature=0.85, top_k=50, top_p=0.95):
+    global device_for_tools
+    # Encode the prompt
+    prompt_as_messages = [
+        {"role": "user", "content": prompt},
+    ]
+    stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
+    inputs = tokenizer.apply_chat_template(prompt_as_messages, tokenize=False, add_generation_prompt=False )
+    encoded_inputs = tokenizer(inputs, return_tensors="pt").to(device_for_tools)
+    src_len = encoded_inputs["input_ids"].shape[1]
+    # Generate the response
+    outputs = model.generate(encoded_inputs["input_ids"],
+                             max_length=max_length,
+                             temperature=temperature,
+                             top_k=top_k,
+                             top_p=top_p,
+                             do_sample=True,
+                             stopping_criteria=stopping_criteria,)
+    # Decode the response
+    return tokenizer.decode(outputs[0].tolist()[src_len:-1])
+
+# ===== ===== ===== #
+# Direct communication
+class DirectCommunication():
+    def __init__(self, model, tokenizer, device_for_tools=device_for_tools):
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device_for_tools = device_for_tools
+
+
 # ===== ===== ===== #
 # Load the model and tokenizer
 import torch
@@ -671,12 +711,12 @@ model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", 
 tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
 """
 
-"""
+
 bnb_config = BitsAndBytesConfig(load_in_4bit=True)
 model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", device_map="cuda:0", quantization_config=bnb_config)
 tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit")
 tokenizer_with_prefix_space = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", add_prefix_space=True)
-"""
+
 
 """
 gptq_config = GPTQConfig(bits=8, exllama_config={"version":1})
@@ -685,9 +725,13 @@ tokenizer = AutoTokenizer.from_pretrained("astronomer/Llama-3-8B-Instruct-GPTQ-8
 #model=model.bfloat16()
 """
 
+"""
 model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3-mini-128k-instruct", device_map="cuda:0", trust_remote_code=True)
 tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
+"""
 
+small_model = AutoModelForCausalLM.from_pretrained("unsloth/Phi-3-mini-4k-instruct-bnb-4bit", device_map="cuda:1", trust_remote_code=True)
+small_tokenizer = AutoTokenizer.from_pretrained("unsloth/Phi-3-mini-4k-instruct-bnb-4bit")
 
 Lucid_memory = Memory()
 
@@ -705,13 +749,13 @@ Lucid_council = LucidCouncil(model, tokenizer, AI_Council_data[:-1],
 
 server_handler = ServerHandler(host=host, port=port)
 server_commands = []
-
+is_voice_detection_avaliable = False
+Lucid_mode = None
 async def passive_memory_documentation():
     global Lucid_memory
     while True:
         pass
 
-stop_Lucid_council = False
 
 
 stop_Lucid_council = False
@@ -729,7 +773,7 @@ def Lucid_council_logic():
         if stop_Lucid_council != True:
             if time.time() - last_get_mail_time >= 0.5:
                 last_get_mail_time = time.time()
-                new_mails = server_handler.get_unread_mails()
+                new_mails = server_handler.get_unread_mails(wanted_mail_types=['discord_user_message'])
 
             if new_mails != []:
                 for mail in new_mails:
@@ -749,9 +793,10 @@ def Lucid_council_logic():
         else:
             break
 
-def server_logic():
+def server_mailbox_logic():
     global server_handler
     global server_commands
+    global is_voice_detection_avaliable
 
     while True:
         logging.info(f"Server commands: {server_commands}")
@@ -778,23 +823,73 @@ def server_logic():
             case "send_discord_message":
                 server_handler.send_discord_message(current_command['content'])
 
-        time.sleep(0.1)
+            case "is_voice_detection_avaliable":
+                server_handler.send_information({"type": "command", "command_type": "is_voice_detection_avaliable"})
+                response = server_handler.server_websocket.recv()
+                is_voice_detection_avaliable = json.loads(response)['is_voice_detection_avaliable']
 
-def main():
-    global server_handler, Lucid_council, Lucid_memory
+        time.sleep(0.01)
+
+def direct_communication_logic():
+    global is_voice_detection_avaliable, Lucid_mode, Lucid_prompt_card
+    tts_is_playing = False
+    server_commands.append({"type": "command", "command_type": "is_voice_detection_avaliable"})
+    time.sleep(0.03)
+    current_conversation = [{'role':'system','content':f"You are Lucid, here are some information on Lucid:\n{Lucid_prompt_card}\nPlease respond as if you were Lucid."}]
+    while True:
+        if is_voice_detection_avaliable == True:
+            new_voice_messages = server_handler.get_unread_mails(wanted_mail_types=['voice_message'])
+            if new_voice_messages != []:
+                for message in new_voice_messages:
+                    current_conversation.append({'role':'user','content':message['content']})
+                if tts_is_playing == True:
+                    current_conversation.append({'role':'system','content':f"User interrupted the TTS, TEXT DELIVERED: {' '.join(system_text)}"})
+            
+            pass
+        else:
+            logging.info(f"Voice detection is not avaliable. Direct communication is not possible.\nDefaulting to council mode.")
+            break
+
+def main(starting_mode="council"):
+    """
+    The main function can start in two modes:
+    - council: The Lucid council is active
+    - direct communication: Lucid is communicating with the user through the microphone and speaker
+    """
+    global server_handler, Lucid_council, Lucid_memory, server_commands, is_voice_detection_avaliable, stop_Lucid_council, Lucid_mode
 
     # Start the loop
+    
     server_handler.connect()
-    Lucid_council.start_new_chat("Miko has asked us what tools he should implement that would enable me, Lucid, to make money on the internet. What should we tell him?")
+    server_mailbox_thread = threading.Thread(target=server_mailbox_logic)
+    server_mailbox_thread.start()
+    
+    server_commands.append({"type": "command", "command_type": "is_voice_detection_avaliable"})
+    time.sleep(0.15)
+    if is_voice_detection_avaliable == True:
+        logging.info(f"Voice detection is avaliable. Direct communication is possible.")
+    elif starting_mode == "direct communication":
+        logging.info(f"Voice detection is not avaliable. Direct communication is not possible.\nDefaulting to council mode.")
+        starting_mode = "council"
+    else:
+        logging.info(f"Voice detection is not avaliable. Direct communication is not possible")
 
-    mail_box_collecting_thread = threading.Thread(target=server_logic)
-    Lucid_logic_thread = threading.Thread(target=Lucid_council_logic)
+    
+    Lucid_mode = starting_mode
+    while True:
+        if Lucid_mode == "council":
+            Lucid_council.start_new_chat("We currently have nothing to discuss, what should we do in the meantime?")
+            Lucid_council_logic_thread = threading.Thread(target=Lucid_council_logic)
+            Lucid_council_logic_thread.start()
+            Lucid_council_logic_thread.join()
+            
+        elif Lucid_mode == "direct communication":
+            Lucid_direct_communication_thread = threading.Thread(target=direct_communication_logic)
+            Lucid_direct_communication_thread.start()
+            Lucid_direct_communication_thread.join()
 
-    mail_box_collecting_thread.start()
-    Lucid_logic_thread.start()
 
-    mail_box_collecting_thread.join()
-    Lucid_logic_thread.join()
+
 
 if __name__ == "__main__":
     main()

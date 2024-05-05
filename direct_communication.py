@@ -6,9 +6,6 @@ import time
 import json
 import asyncio
 
-import discord
-from discord.ext import commands, tasks
-
 import websockets
 
 from dotenv import load_dotenv
@@ -33,7 +30,7 @@ class ConnectionManager:
     async def connect_to_server(self):
         self.server_websocket = await websockets.connect(server_ws_uri)
 
-    async def send_to_server(self, message):
+    async def send_to_server(self, message): 
         print("Sending message to server:", message)
         await self.server_websocket.send(json.dumps(message))
 
@@ -41,7 +38,7 @@ connection_manager = ConnectionManager()
 
 def send_message(message: str):
     global connection_manager
-    asyncio.run(connection_manager.send_to_server({"message": message}))
+    asyncio.run(connection_manager.send_to_server({"content": message,"source": "Miko" ,"timestamp": time.time(), "type": "voice_message"}))
 
 demo = VoiceRecognition(wake_word=None, function=send_message)
 demo.start()

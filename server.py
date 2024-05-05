@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 logger.info('API is starting up')
 logger.debug('Debugging is enabled')
 uncollected_mails = []
-
+is_voice_detection_avaliable = False
 class ServerConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -116,6 +116,9 @@ async def main_script_endpoint(websocket: WebSocket):
                             logger.info(f"Logging message: {content}")
                             await manager.log_to_discord(content)
                             # Log the content...
+                            
+                        case "is_voice_detection_avaliable":
+                            await websocket.send_text(json.dumps({"is_voice_detection_avaliable":is_voice_detection_avaliable}))
                 
                 case "Lucid_output":
                     match data.get("output_type"):
@@ -140,12 +143,14 @@ async def main_script_endpoint(websocket: WebSocket):
             
 @app.websocket("/ws/voice_recognition")
 async def voice_recognition_endpoint(websocket: WebSocket):
+    global is_voice_detection_avaliable
     await manager.connect(websocket)
+    is_voice_detection_avaliable = True
     try:
         while True:
             data = await websocket.receive_text()
-            message = {'content':data,'source':data.get('source'),'timestamp':data.get('timestamp'), 'type':'discord_user_message'}
-            await manager.broadcast(data)
+            message = {'content':data,'source':data.get('source'),'timestamp':data.get('timestamp'), 'type':'voice_recognition_message'}
+            uncollected_mails.append(message)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         await manager.log_to_discord("voice_recognition has disconnected")
