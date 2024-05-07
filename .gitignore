@@ -1,3 +1,9 @@
 dpet/
 cool assets/
 .env
+TTS/checkpoints
+TTS/checkpoints_v2
+TTS/outputs
+TTS/processed
+TTS/resources
+TTS/piper
