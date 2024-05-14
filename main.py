@@ -690,6 +690,22 @@ def single_turn_conversation(prompt, model, tokenizer, max_length=256, temperatu
                              stopping_criteria=stopping_criteria,)
     # Decode the response
     return tokenizer.decode(outputs[0].tolist()[src_len:-1])
+def respond_or_not(conversation: dict) -> bool:
+    """This function takes a conversation (The dictionary type with user, system, assistant...) and decides whether to respond or not."""
+    conversation_string = "The following is a conversation between an AI assistant and a User:\n"
+    for i in conversation:
+        if i["role"] == "user":
+            conversation_string += f"User: {i['content']}\n"
+        elif i["role"] == "system":
+            conversation_string += f"System: {i['content']}\n"
+        elif i["role"] == "assistant":
+            conversation_string += f"Assistant: {i['content']}\n"
+        conversation_string += "\nWould the AI respond to this conversation, or stay silent? Please answer with a simple 'Yes' for respond and 'No' for staying silent."
+    response = single_turn_conversation(conversation_string, model, tokenizer)
+    if response[:3].lower() == "yes":
+        return True
+    else:
+        return False
 
 # ===== ===== ===== #
 # Direct communication
@@ -751,6 +767,11 @@ server_handler = ServerHandler(host=host, port=port)
 server_commands = []
 is_voice_detection_avaliable = False
 Lucid_mode = None
+
+
+# ===== ===== ===== #
+# Threads/Logics
+
 async def passive_memory_documentation():
     global Lucid_memory
     while True:
@@ -830,22 +851,31 @@ def server_mailbox_logic():
 
         time.sleep(0.01)
 
+direct_communication_model = model
+direct_communication_tokenizer = tokenizer
+
 def direct_communication_logic():
-    global is_voice_detection_avaliable, Lucid_mode, Lucid_prompt_card
+    global is_voice_detection_avaliable, Lucid_mode, Lucid_prompt_card, direct_communication_model, direct_communication_tokenizer, Lucid_memory, server_handler, server_commands
     tts_is_playing = False
     server_commands.append({"type": "command", "command_type": "is_voice_detection_avaliable"})
     time.sleep(0.03)
     current_conversation = [{'role':'system','content':f"You are Lucid, here are some information on Lucid:\n{Lucid_prompt_card}\nPlease respond as if you were Lucid."}]
     while True:
         if is_voice_detection_avaliable == True:
+            
+            
             new_voice_messages = server_handler.get_unread_mails(wanted_mail_types=['voice_message'])
+            
             if new_voice_messages != []:
-                for message in new_voice_messages:
-                    current_conversation.append({'role':'user','content':message['content']})
                 if tts_is_playing == True:
                     current_conversation.append({'role':'system','content':f"User interrupted the TTS, TEXT DELIVERED: {' '.join(system_text)}"})
+                for message in new_voice_messages:
+                    current_conversation.append({'role':'user','content':message['content']})
+            else:
+                if respond_or_not(current_conversation) == True:
+                    
+                    pass        
             
-            pass
         else:
             logging.info(f"Voice detection is not avaliable. Direct communication is not possible.\nDefaulting to council mode.")
             break
