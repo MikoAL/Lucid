@@ -10,9 +10,10 @@ import os
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"]='0'
 
-from . import vad
+import vad
 
 VAD_MODEL_PATH = r"C:\Users\User\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
+VAD_MODEL_PATH = r"C:\Users\Miko_AL\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
 SAMPLE_RATE = 16000  # Sample rate for input stream
 VAD_SIZE = 50  # Milliseconds of sample for Voice Activity Detection (VAD)
 VAD_THRESHOLD = 0.90  # Threshold for VAD detection
@@ -28,7 +29,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
 model_id = "distil-whisper/distil-large-v3"
-
+model_id = "distil-whisper/distil-small.en"
 model = AutoModelForSpeechSeq2Seq.from_pretrained(
     model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
 )
