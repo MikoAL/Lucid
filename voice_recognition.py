@@ -4,7 +4,7 @@ from typing import Callable, List
 import numpy as np
 import sounddevice as sd
 from Levenshtein import distance
-from loguru import logger
+import logging
 
 import os
 
@@ -13,10 +13,10 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"]='0'
 import vad
 
 VAD_MODEL_PATH = r"C:\Users\User\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
-VAD_MODEL_PATH = r"C:\Users\Miko_AL\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
+#VAD_MODEL_PATH = r"C:\Users\Miko_AL\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
 SAMPLE_RATE = 16000  # Sample rate for input stream
 VAD_SIZE = 50  # Milliseconds of sample for Voice Activity Detection (VAD)
-VAD_THRESHOLD = 0.90  # Threshold for VAD detection
+VAD_THRESHOLD = 0.80  # Threshold for VAD detection
 BUFFER_SIZE = 600  # Milliseconds of buffer before VAD detection
 PAUSE_LIMIT = 500  # Milliseconds of pause allowed before processing
 WAKE_WORD = None  # Wake word for activation
@@ -29,7 +29,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
 model_id = "distil-whisper/distil-large-v3"
-model_id = "distil-whisper/distil-small.en"
+#model_id = "distil-whisper/distil-small.en"
 model = AutoModelForSpeechSeq2Seq.from_pretrained(
     model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
 )
@@ -114,16 +114,16 @@ class VoiceRecognition:
         """
         Starts the Glados voice assistant, continuously listening for input and responding.
         """
-        logger.info("Starting Listening...")
+        logging.info("Starting Listening...")
         self.input_stream.start()
-        logger.info("Listening Running")
+        logging.info("Listening Running")
         self._listen_and_respond()
 
     def _listen_and_respond(self):
         """
         Listens for audio input and responds appropriately when the wake word is detected.
         """
-        logger.info("Listening...")
+        logging.info("Listening...")
         while True:  # Loop forever, but is 'paused' when new samples are not available
             sample, vad_confidence = self.sample_queue.get()
             self._handle_audio_sample(sample, vad_confidence)
@@ -182,9 +182,9 @@ class VoiceRecognition:
         """
         Processes the detected audio and generates a response.
         """
-        logger.info("Detected pause after speech. Processing...")
+        logging.info("Detected pause after speech. Processing...")
 
-        logger.info("Stopping listening...")
+        logging.info("Stopping listening...")
         self.input_stream.stop()
 
         #detected_text = self.asr(self.samples)
@@ -196,14 +196,14 @@ class VoiceRecognition:
         detected_text = pipe(audio)['text']
 
         if detected_text:
-            logger.info(f"Detected: '{detected_text}'")
+            logging.info(f"Detected: '{detected_text}'")
 
             if self.wake_word is not None:
                 if self._wakeword_detected(detected_text):
-                    logger.info("Wake word detected!")
+                    logging.info("Wake word detected!")
                     self.func(detected_text)
                 else:
-                    logger.info("No wake word detected. Ignoring...")
+                    logging.info("No wake word detected. Ignoring...")
             else:
                 self.func(detected_text)
 
@@ -215,7 +215,7 @@ class VoiceRecognition:
         """
         Resets the recording state and clears buffers.
         """
-        logger.info("Resetting recorder...")
+        logging.info("Resetting recorder...")
         self.recording_started = False
         self.samples.clear()
         self.gap_counter = 0

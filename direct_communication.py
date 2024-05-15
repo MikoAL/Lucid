@@ -1,4 +1,4 @@
-from voice_recognition.voice_recognition import VoiceRecognition
+from .voice_recognition.voice_recognition import VoiceRecognition
 import os
 import yaml
 import logging
