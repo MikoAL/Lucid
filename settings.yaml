@@ -30,3 +30,8 @@ main_lm_settings:
   top_k: 3
   top_p: 1.0
   repetition_penalty: 1.2
+
+tts_settings:
+  model_path: ./TTS/models/glados.onnx
+  max_wav_value: 32767.0
+  rate: 22050

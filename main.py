@@ -11,6 +11,7 @@ import re
 import numpy as np
 import random
 import threading
+import sounddevice as sd
 #os.environ['TRANSFORMERS_OFFLINE']="1"
 
 import transformers
@@ -36,6 +37,9 @@ host = settings['host']
 port = settings['port']
 server = f'http://{host}:{port}'
 
+tts_model = settings['tts_settings']['model_path']
+tts_rate = settings['tts_settings']['rate']
+tts_max_wav_value = settings['tts_settings']['max_wav_value']
 """
 small_lm_name = settings['small_lm_settings']['language_model']
 small_lm_temperature = settings['small_lm_settings']['temperature']
@@ -664,6 +668,24 @@ class web_search(Tool):
     
     def __call__(self, query, num_results=5): 
         pass
+# ===== ===== ===== #
+# TTS function
+from .tts import Synthesizer
+import sounddevice as sd
+TTS_USE_CUDA = False
+synthesizer = Synthesizer(tts_model, TTS_USE_CUDA)
+text = "Hello, world!"
+import time
+
+start_time = time.time()
+audio = synthesizer.generate_speech_audio(text)
+print(f"Generated audio for '{text}' in {time.time() - start_time:.2f} seconds.")
+sd.play(audio, tts_rate)
+sd.wait()
+print(f"Generated audio for '{text}'.")
+tts_audio_queue = []
+tts_text_queue = []
+
 
 # ===== ===== ===== #
 # Utility functions
@@ -777,8 +799,6 @@ async def passive_memory_documentation():
     while True:
         pass
 
-
-
 stop_Lucid_council = False
 
 def Lucid_council_logic():
@@ -855,8 +875,9 @@ direct_communication_model = model
 direct_communication_tokenizer = tokenizer
 
 def direct_communication_logic():
-    global is_voice_detection_avaliable, Lucid_mode, Lucid_prompt_card, direct_communication_model, direct_communication_tokenizer, Lucid_memory, server_handler, server_commands
+    global is_voice_detection_avaliable, Lucid_mode, Lucid_prompt_card, direct_communication_model, direct_communication_tokenizer, Lucid_memory, server_handler, server_commands, synthesizer, tts_is_playing, tts_audio_queue, tts_text_queue
     tts_is_playing = False
+    tts_audio_queue = []
     server_commands.append({"type": "command", "command_type": "is_voice_detection_avaliable"})
     time.sleep(0.03)
     current_conversation = [{'role':'system','content':f"You are Lucid, here are some information on Lucid:\n{Lucid_prompt_card}\nPlease respond as if you were Lucid."}]
@@ -868,18 +889,74 @@ def direct_communication_logic():
             
             if new_voice_messages != []:
                 if tts_is_playing == True:
+                    interrupt_tts = True
                     current_conversation.append({'role':'system','content':f"User interrupted the TTS, TEXT DELIVERED: {' '.join(system_text)}"})
                 for message in new_voice_messages:
                     current_conversation.append({'role':'user','content':message['content']})
             else:
                 if respond_or_not(current_conversation) == True:
+                    stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
+                    inputs = direct_communication_tokenizer.apply_chat_template(current_conversation, tokenize=False, add_generation_prompt=False )
+                    encoded_inputs = direct_communication_tokenizer(inputs, return_tensors="pt").to(device_for_tools)
+                    src_len = encoded_inputs["input_ids"].shape[1]
+                    # Generate the response
+                    outputs = direct_communication_model.generate(encoded_inputs["input_ids"],
+                                            max_length=512,
+                                            temperature=0.85,
+                                            top_k=50,
+                                            top_p=0.95,
+                                            do_sample=True,
+                                            stopping_criteria=stopping_criteria,)
+                    # Decode the response
+                    response = direct_communication_tokenizer.decode(outputs[0].tolist()[src_len:-1])
+                    tts_text_queue.append(response)
+                    while tts_text_queue != []:
+                        try:
+                            sd.get_status()
+                            tts_is_playing = True
+                        except RuntimeError as e:
+                            if str(e) == "play()/rec()/playrec() was not called yet":
+                                tts_is_playing = False
+                        
+                                            
+
+                        if (tts_is_playing == True) and (interrupt_tts == True):
+                            sd.stop()
+                            tts_audio_queue = []
+                            # Calculate the amount said
+                        elif (tts_is_playing == False):
+                            if tts_audio_queue != []:
+                                sd.play(tts_audio_queue.pop(0), tts_rate)
+                            if tts_text_queue != []:
+                                audio = synthesizer.generate_speech_audio(tts_text_queue.pop(0))
+                                tts_audio_queue.append(audio)
+
+                                                    
+                     
+                    current_conversation.append({'role':'assistant','content':response})
                     
-                    pass        
-            
         else:
             logging.info(f"Voice detection is not avaliable. Direct communication is not possible.\nDefaulting to council mode.")
             break
-
+def tts_handling():
+    global synthesizer, tts_audio_queue, tts_text_queue, tts_is_playing, 
+    while True:
+        if tts_audio_queue != []:
+            if (tts_is_playing == False) and :
+                tts_is_playing = True
+                audio = synthesizer.generate_speech_audio(tts_text_queue.pop(0))
+                sd.play(audio, tts_rate)
+                tts_is_playing = False
+                tts_audio_queue.pop(0)
+        try:
+            sd.get_status()
+            tts_is_playing = True
+        except RuntimeError as e:
+            if str(e) == "play()/rec()/playrec() was not called yet":
+                tts_is_playing = False
+            else:
+                raise e
+        time.sleep(0.01)
 def main(starting_mode="council"):
     """
     The main function can start in two modes:
