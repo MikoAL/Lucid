@@ -918,7 +918,6 @@ def direct_communication_logic():
                             if str(e) == "play()/rec()/playrec() was not called yet":
                                 tts_is_playing = False
                         
-                                            
 
                         if (tts_is_playing == True) and (interrupt_tts == True):
                             sd.stop()
@@ -931,32 +930,13 @@ def direct_communication_logic():
                                 audio = synthesizer.generate_speech_audio(tts_text_queue.pop(0))
                                 tts_audio_queue.append(audio)
 
-                                                    
                      
                     current_conversation.append({'role':'assistant','content':response})
                     
         else:
             logging.info(f"Voice detection is not avaliable. Direct communication is not possible.\nDefaulting to council mode.")
             break
-def tts_handling():
-    global synthesizer, tts_audio_queue, tts_text_queue, tts_is_playing, 
-    while True:
-        if tts_audio_queue != []:
-            if (tts_is_playing == False) and :
-                tts_is_playing = True
-                audio = synthesizer.generate_speech_audio(tts_text_queue.pop(0))
-                sd.play(audio, tts_rate)
-                tts_is_playing = False
-                tts_audio_queue.pop(0)
-        try:
-            sd.get_status()
-            tts_is_playing = True
-        except RuntimeError as e:
-            if str(e) == "play()/rec()/playrec() was not called yet":
-                tts_is_playing = False
-            else:
-                raise e
-        time.sleep(0.01)
+
 def main(starting_mode="council"):
     """
     The main function can start in two modes:
