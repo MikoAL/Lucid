@@ -30,16 +30,14 @@ class TTSEngine:
         while True:
             
             start_time = time.time()
-            logging.info(f"tts_text_queue: {(self.tts_text_queue)}\ntts_audio_queue: {(self.tts_audio_queue)}")
-            while not (self.tts_text_queue.empty() and self.tts_audio_queue.empty() and not self.tts_is_playing):
-                
+            while ((not self.tts_text_queue.empty()) or (not self.tts_audio_queue.empty()) or (self.tts_is_playing)):
+                logging.info(f"tts_text_queue: {list(self.tts_text_queue.queue)}, tts_audio_queue: {list(self.tts_audio_queue.queue)}, tts_is_playing: {self.tts_is_playing}")
                 try:
-                    sd_status = sd.get_status()
-                    self.tts_is_playing = True
+                    self.tts_is_playing = sd.get_stream().active
                 except RuntimeError as e:
                     if str(e) == "play()/rec()/playrec() was not called yet":
                         self.tts_is_playing = False
-                logging.info(f"tts_is_playing: {self.tts_is_playing}, interrupt_tts: {self.interrupt_tts}")
+                #logging.info(f"tts_is_playing: {self.tts_is_playing}, interrupt_tts: {self.interrupt_tts}")
                 if self.interrupt_tts:
                     sd.stop()
                     with self.tts_audio_queue.mutex:
@@ -66,6 +64,7 @@ class TTSEngine:
                             time.sleep(0.1)
 
             logging.info(f"\nTotal response time: {(time.time() - start_time):.2f} seconds.")
+    
 
     def add_to_queue(self, text):
         logging.info(f"Adding '{text}' to the TTS queue.")
@@ -89,7 +88,7 @@ if __name__ == "__main__":
     text="Hello, world!"
     audio = synthesizer.generate_speech_audio(text)
     sd.play(audio, 22050)
-
+    
     threading.Thread(target=tts_engine.thread_logic).start()
     # Add some responses to the queue
     tts_engine.add_to_queue("Hello, this is a test.")
@@ -98,6 +97,8 @@ if __name__ == "__main__":
     logging.info("Responses added to the queue.")
     # Wait for a few seconds to allow the TTS engine to process the responses
     time.sleep(5)
+    logging.info(f"{sd.get_stream().active}")
+    
 
     # Interrupt the TTS playback
     logging.info("Interrupting TTS playback.")
