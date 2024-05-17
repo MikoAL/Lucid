@@ -12,7 +12,7 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"]='0'
 
 from . import vad
 
-VAD_MODEL_PATH = r"C:\Users\User\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
+VAD_MODEL_PATH = r"C:\Users\User\Desktop\Projects\Lucid\modules\models\silero_vad.onnx"
 #VAD_MODEL_PATH = r"C:\Users\Miko_AL\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
 SAMPLE_RATE = 16000  # Sample rate for input stream
 VAD_SIZE = 50  # Milliseconds of sample for Voice Activity Detection (VAD)

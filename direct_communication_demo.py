@@ -1,4 +1,5 @@
 import os
+
 import time
 import transformers
 import torch
@@ -6,7 +7,7 @@ from transformers.tools.agents import resolve_tools, evaluate, get_tool_creation
 import transformers.tools.agents
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import StoppingCriteriaList
-from .modules.tts import TTSEngine
+from modules.tts import TTSEngine
 import logging
 import threading
 from threading import Event
@@ -120,7 +121,7 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
 # ===== ===== ===== #
 # Main
 
-from .modules.voice_recognition import VoiceRecognition
+from modules.voice_recognition import VoiceRecognition
 
 
 user_text_queue = Queue()
@@ -135,9 +136,10 @@ def handle_user_input(text):
 microphone = VoiceRecognition(wake_word=None, function=handle_user_input)
 
 # Start microphone
-#threading.Thread(target=microphone.start).start()
+threading.Thread(target=microphone.start).start()
 
 new_user_input_event.set()
 user_text_queue.put("Hello, Lucid!")
-tts_engine = TTSEngine(rate=tts_rate)
+tts_engine = TTSEngine()
+threading.Thread(target=tts_engine.start).start()
 threading.Thread(target=direct_communication_logic, args=(tts_engine, new_user_input_event, user_text_queue, model, tokenizer)).start()

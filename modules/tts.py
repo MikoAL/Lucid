@@ -335,7 +335,7 @@ class Synthesizer:
 
         return audio
 class TTSEngine:
-    def __init__(self, synthesizer, tts_rate):
+    def __init__(self, synthesizer=Synthesizer(model_path=f"{script_location}/models/glados.onnx", use_cuda=False), tts_rate=22050):
         self.synthesizer = synthesizer
         self.tts_rate = tts_rate
         self.tts_text_queue = []
@@ -345,6 +345,10 @@ class TTSEngine:
         self.current_audio_start_time = 0
         self.current_audio_estimated_end_time = 0
         self.current_audio_text = ""
+
+    def start(self):
+        logging.info("Starting TTS engine thread.")
+        return self.thread_logic
 
     def thread_logic(self):
         while True:
@@ -427,7 +431,8 @@ if __name__ == "__main__":
 
     # Create a TTS engine instance
     tts_engine = TTSEngine(synthesizer, tts_rate=22050)
-
+    tts_engine.add_to_queue("I am trying to synthesize speech.")
+"""
     logging.info("Test starting...")
 
     logging.info("Testing Synthesizer.")
@@ -458,4 +463,4 @@ if __name__ == "__main__":
     logging.info(f"Played Text: {tts_engine.interrupt_tts_playback()}")
 
 
-    print("Test completed.")
+    print("Test completed.")"""
