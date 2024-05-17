@@ -1,9 +1,0 @@
-Simple stats i guess idk
-
-Boredom 0~10
-Energy 0~10
-Joy 0~10
-Attention 0~10
-Stress 0~10
-
-Goal driven

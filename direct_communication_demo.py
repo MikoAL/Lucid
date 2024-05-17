@@ -6,12 +6,13 @@ from transformers.tools.agents import resolve_tools, evaluate, get_tool_creation
 import transformers.tools.agents
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import StoppingCriteriaList
-from tts import Synthesizer
+from .modules.tts import TTSEngine
 import logging
 import sounddevice as sd
 import threading
 from threading import Event
 from queue import Queue
+
 logging.basicConfig(level=logging.INFO)
 tts_rate = 22050
 prompt_path = r".\Prompts"
