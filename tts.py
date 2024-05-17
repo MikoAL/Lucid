@@ -10,13 +10,13 @@ import sounddevice as sd
 from piper import PiperVoice
 
 script_location = os.path.dirname(os.path.realpath(__file__))
-
+os.chdir("C:\Program Files\eSpeak NG")
 # Constants
 MAX_WAV_VALUE = 32767.0
 RATE = 22050
 
 # Settings
-MODEL_PATH = f"{script_location}\models\en_GB-cori-high.onnx"
+MODEL_PATH = f"{script_location}\\tts\models\glados.onnx"
 USE_CUDA = False
 
 # Conversions

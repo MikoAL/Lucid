@@ -13,7 +13,7 @@ import threading
 from threading import Event, Thread
 from queue import Queue
 script_location = os.path.dirname(os.path.realpath(__file__))
-os.chdir(script_location)
+#os.chdir(script_location)
 logging.basicConfig(level=logging.INFO)
 
 class TTSEngine:
@@ -31,10 +31,10 @@ class TTSEngine:
             
             start_time = time.time()
             logging.info(f"tts_text_queue: {(self.tts_text_queue)}\ntts_audio_queue: {(self.tts_audio_queue)}")
-            while not (self.tts_text_queue.empty() and self.tts_audio_queue.empty()):
+            while not (self.tts_text_queue.empty() and self.tts_audio_queue.empty() and not self.tts_is_playing):
                 
                 try:
-                    sd_status = sd.get_stream()
+                    sd_status = sd.get_status()
                     self.tts_is_playing = True
                 except RuntimeError as e:
                     if str(e) == "play()/rec()/playrec() was not called yet":
@@ -76,12 +76,20 @@ class TTSEngine:
         
 if __name__ == "__main__":
     # Create a dummy Synthesizer instance
-    synthesizer = Synthesizer(model_path="./tts/models/glados.onnx", use_cuda=False)
+    print(sd.get_status)
+    synthesizer = Synthesizer(model_path=f"{script_location}/tts/models/glados.onnx", use_cuda=False)
 
     # Create a TTS engine instance
     tts_engine = TTSEngine(synthesizer, tts_rate=22050)
 
     logging.info("Test starting...")
+
+    logging.info("Testing Synthesizer.")
+
+    text="Hello, world!"
+    audio = synthesizer.generate_speech_audio(text)
+    sd.play(audio, 22050)
+
     threading.Thread(target=tts_engine.thread_logic).start()
     # Add some responses to the queue
     tts_engine.add_to_queue("Hello, this is a test.")
