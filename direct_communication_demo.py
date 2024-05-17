@@ -8,7 +8,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import StoppingCriteriaList
 from .modules.tts import TTSEngine
 import logging
-import sounddevice as sd
 import threading
 from threading import Event
 from queue import Queue
@@ -66,7 +65,7 @@ def respond_or_not(conversation: dict) -> bool:
         elif i["role"] == "assistant":
             conversation_string += f"Assistant: {i['content']}\n"
     conversation_string += "\nWould the AI respond to this conversation, or stay silent? Please answer with a simple 'Yes.' for respond and 'No.' for staying silent."
-    response = single_turn_conversation(conversation_string, small_model, small_tokenizer)
+    response = single_turn_conversation(conversation_string, small_model, small_tokenizer, max_new_tokens=5)
     logging.info(f"Conversation: \n{conversation_string}\n<End Of Conversation String>\n")
     logging.info(f"\nAI Response: \n{response}")
     if response[:3].lower() == "yes":
@@ -78,12 +77,8 @@ def respond_or_not(conversation: dict) -> bool:
 
 # ===== ===== ===== #
 
-def direct_communication_logic(new_user_input_event: Event, user_text_queue: Queue, direct_communication_model, direct_communication_tokenizer):
-    global device_for_tools, tts_rate, synthesizer, tts_is_playing, tts_audio_queue, tts_text_queue, Lucid_prompt_card
-    synthesizer = Synthesizer(model_path="./tts/models/glados.onnx", use_cuda=False)
-    tts_is_playing = False
-    tts_audio_queue = []
-    tts_text_queue = []
+def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event, user_text_queue: Queue, direct_communication_model, direct_communication_tokenizer):
+
     time.sleep(0.03)
     current_conversation = [{'role':'system','content':f"You are Lucid, here are some information on Lucid:\n{Lucid_prompt_card}\nPlease respond as if you were Lucid."}]
     while True:
@@ -117,38 +112,7 @@ def direct_communication_logic(new_user_input_event: Event, user_text_queue: Que
                 # Decode the response
                 response = direct_communication_tokenizer.decode(outputs[0].tolist()[src_len:-1])
                 logging.info(f"AI Response: {response}")
-                tts_text_queue.append(response)
-                counter = 0
-                while (tts_text_queue != []) or (tts_audio_queue != []):
-                    counter += 1
-                    try:
-                        sd.get_status()
-                        tts_is_playing = True
-                    except RuntimeError as e:
-                        if str(e) == "play()/rec()/playrec() was not called yet":
-                            tts_is_playing = False
-
-                    if (tts_is_playing == True) and (interrupt_tts == True):
-                        sd.stop()
-                        tts_audio_queue = []
-                        tts_text_queue = []
-                        # Calculate the amount said
-                        
-                    elif (tts_is_playing == True) and (interrupt_tts == False):
-                        audio = synthesizer.generate_speech_audio(tts_text_queue.pop(0))
-                        tts_audio_queue.append(audio)
-                        
-                    elif (tts_is_playing == False) and (interrupt_tts == True):
-                        pass
-                    elif (tts_is_playing == False) and (interrupt_tts == False):
-                        if tts_audio_queue != []:
-                            sd.play(tts_audio_queue.pop(0), tts_rate)
-                        else:
-                            start_synth = time.time()
-                            audio = synthesizer.generate_speech_audio(tts_text_queue.pop(0))
-                            logging.info(f"\nGenerated audio for '{response}' in {time.time() - start_synth:.2f} seconds.")
-                            sd.play(audio, tts_rate)
-                    logging.info(f"Counter: {counter}")
+                tts_engine.tts_text_queue.append(response)
 
                 logging.info(f"\nTotal response time: {(time.time() - start_time):.2f} seconds.")
                 current_conversation.append({'role':'assistant','content':response})
@@ -157,7 +121,7 @@ def direct_communication_logic(new_user_input_event: Event, user_text_queue: Que
 # ===== ===== ===== #
 # Main
 
-from voice_recognition import VoiceRecognition
+from .modules.voice_recognition import VoiceRecognition
 
 
 user_text_queue = Queue()
@@ -175,5 +139,5 @@ microphone = VoiceRecognition(wake_word=None, function=handle_user_input)
 #threading.Thread(target=microphone.start).start()
 
 new_user_input_event.set()
-user_text_queue.put("Hello, world!")
+user_text_queue.put("Hello, Lucid!")
 threading.Thread(target=direct_communication_logic, args=(new_user_input_event, user_text_queue, model, tokenizer)).start()

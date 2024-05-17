@@ -10,7 +10,7 @@ import os
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"]='0'
 
-import vad
+from . import vad
 
 VAD_MODEL_PATH = r"C:\Users\User\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
 #VAD_MODEL_PATH = r"C:\Users\Miko_AL\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
