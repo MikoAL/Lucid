@@ -89,7 +89,8 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
             start_time = time.time()
             user_input = user_text_queue.get()
             logging.info(f"Got User Input: {user_input}")
-            interrupt_tts = True
+            played_text = tts_engine.interrupt_tts_playback()
+            current_conversation.append({"role": "system", "content": f"USER INTERRUPTED TTS PLAYBACK, TEXT DELIVERED: '{played_text}'"})
             current_conversation.append({'role': 'user', 'content': user_input})
 
             start_respond_or_not = time.time()
@@ -112,9 +113,7 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
                 # Decode the response
                 response = direct_communication_tokenizer.decode(outputs[0].tolist()[src_len:-1])
                 logging.info(f"AI Response: {response}")
-                tts_engine.tts_text_queue.append(response)
-
-                logging.info(f"\nTotal response time: {(time.time() - start_time):.2f} seconds.")
+                tts_engine.add_to_queue(response)
                 current_conversation.append({'role':'assistant','content':response})
         
 
@@ -140,4 +139,5 @@ microphone = VoiceRecognition(wake_word=None, function=handle_user_input)
 
 new_user_input_event.set()
 user_text_queue.put("Hello, Lucid!")
-threading.Thread(target=direct_communication_logic, args=(new_user_input_event, user_text_queue, model, tokenizer)).start()
+tts_engine = TTSEngine(rate=tts_rate)
+threading.Thread(target=direct_communication_logic, args=(tts_engine, new_user_input_event, user_text_queue, model, tokenizer)).start()
