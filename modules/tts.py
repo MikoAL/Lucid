@@ -16,8 +16,12 @@ from queue import Queue
 import time
 from datetime import datetime
 import logging
-logging.basicConfig(level=logging.INFO)
-
+from rich.logging import RichHandler
+FORMAT = "%(message)s"  
+logging.basicConfig(
+    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler(rich_tracebacks=True,)]
+)
+logger = logging.getLogger("rich")
 script_location = os.path.dirname(os.path.realpath(__file__))
 os.chdir("C:\Program Files\eSpeak NG")
 # Constants
@@ -342,19 +346,16 @@ class TTSEngine:
         self.tts_audio_queue = []
         self.tts_is_playing = False
         self.tts_audio_queue_text = []
-        self.current_audio_start_time = 0
-        self.current_audio_estimated_end_time = 0
+        self.current_audio_start_time = time.time()-1
+        self.current_audio_estimated_end_time = time.time()-0.5
         self.current_audio_text = ""
 
-    def start(self):
-        logging.info("Starting TTS engine thread.")
-        return self.thread_logic
 
     def thread_logic(self):
         while True:
             start_time = time.time()
             time.sleep(0.01)
-            #logging.info(f"tts_text_queue: {self.tts_text_queue}\ntts_audio_queue: {self.tts_audio_queue}")
+            #logger.info(f"tts_text_queue: {self.tts_text_queue}\ntts_audio_queue: {self.tts_audio_queue}")
             
             if time.time() > self.current_audio_estimated_end_time:
                 self.tts_is_playing = False
@@ -369,47 +370,47 @@ class TTSEngine:
                 sd.play(audio, self.tts_rate)
                 self.current_audio_estimated_end_time = (time.time() + (len(audio) / self.tts_rate)*1.1)
                 self.tts_is_playing = True
-                logging.info(f"Estimated end time: {datetime.fromtimestamp(self.current_audio_estimated_end_time)}")
+                logger.info(f"Estimated end time: {datetime.fromtimestamp(self.current_audio_estimated_end_time)}")
 
                 
             if self.tts_text_queue:
                 response = self.tts_text_queue.pop(0)
-                logging.info(f"Generating audio for '{response}'.")
+                logger.info(f"Generating audio for '{response}'.")
                 audio = self.synthesizer.generate_speech_audio(response)
                 self.tts_audio_queue.append(audio)
                 self.tts_audio_queue_text.append(response)
-                logging.info(f"Added '{response}' to the TTS audio queue.")
+                logger.info(f"Added '{response}' to the TTS audio queue.")
 
-            #logging.info(f"\nTotal response time: {(time.time() - start_time):.2f} seconds.")
+            #logger.info(f"\nTotal response time: {(time.time() - start_time):.2f} seconds.")
 
     def add_to_queue(self, text):
         """Adds the given text to the TTS queue."""
-        #logging.info(f"Adding '{text}' to the TTS queue.")
+        #logger.info(f"Adding '{text}' to the TTS queue.")
         self.tts_text_queue.append(text)
-        logging.info(f"Successfully added '{text}' to the TTS queue.")
+        logger.info(f"Successfully added '{text}' to the TTS queue.")
 
     def interrupt_tts_playback(self):
         """Interrupts the TTS playback and returns the last played text."""
-        logging.info("Interrupting TTS playback.")
-        logging.info(f"Skipped Text Queue: {self.tts_text_queue}\nSkipped Audio Queue: {self.tts_audio_queue_text}")
+        logger.info("Interrupting TTS playback.")
+        logger.info(f"Skipped Text Queue: {self.tts_text_queue}\nSkipped Audio Queue: {self.tts_audio_queue_text}")
         self.tts_audio_queue.clear()
         self.tts_text_queue.clear()
         self.tts_is_playing = False
         sd.stop()
-        logging.info(f"Last played text: {self.current_audio_text}")
+        logger.info(f"Last played text: {self.current_audio_text}")
         
         last_played_text = self.current_audio_text
-        logging.info(f"Played {(time.time() - self.current_audio_start_time):.2f} seconds of audio.")
-        #logging.info(f"Start Time: {self.current_audio_start_time}\nEnd Time: {self.current_audio_estimated_end_time}")
-        #logging.info(f"Estimated time needed: {(self.current_audio_estimated_end_time - self.current_audio_start_time):.2f} seconds.")
+        logger.info(f"Played {(time.time() - self.current_audio_start_time):.2f} seconds of audio.")
+        #logger.info(f"Start Time: {self.current_audio_start_time}\nEnd Time: {self.current_audio_estimated_end_time}")
+        #logger.info(f"Estimated time needed: {(self.current_audio_estimated_end_time - self.current_audio_start_time):.2f} seconds.")
         try:
             played_percentage = (time.time() - self.current_audio_start_time) / (self.current_audio_estimated_end_time - self.current_audio_start_time)
         except ZeroDivisionError:
             played_percentage = 0
         full_index = len(last_played_text)
-        logging.info(f"Played Percentage: {played_percentage}")
+        logger.info(f"Played Percentage: {played_percentage}")
         played_index = round(full_index * played_percentage)
-        #logging.info(f"Played Index: {played_index}")
+        #logger.info(f"Played Index: {played_index}")
         if played_index > full_index:
             played_index = full_index
             
@@ -420,7 +421,7 @@ class TTSEngine:
         self.current_audio_start_time = 0
         self.current_audio_estimated_end_time = 0
         self.current_audio_text = ""
-        logging.info(f"Played text: {last_played_text[:played_index]}")
+        logger.info(f"Played text: {last_played_text[:played_index]}")
         return last_played_text[:played_index]
 
 
@@ -431,36 +432,39 @@ if __name__ == "__main__":
 
     # Create a TTS engine instance
     tts_engine = TTSEngine(synthesizer, tts_rate=22050)
+    threading.Thread(target=tts_engine.thread_logic).start()
     tts_engine.add_to_queue("I am trying to synthesize speech.")
+    time.sleep(5)
+    tts_engine.add_to_queue("I am trying to synthesize speech. again.")
+    time.sleep(5)
 """
-    logging.info("Test starting...")
+    logger.info("Test starting...")
 
-    logging.info("Testing Synthesizer.")
+    logger.info("Testing Synthesizer.")
 
     text="Hello, world!"
     audio = synthesizer.generate_speech_audio(text)
     duration = len(audio) / 22050.0
-    logging.info(f"Audio duration: {duration:.2f} seconds.")
+    logger.info(f"Audio duration: {duration:.2f} seconds.")
     sd.play(audio, 22050)
 
     threading.Thread(target=tts_engine.thread_logic).start()
     # Add some responses to the queue
     tts_engine.add_to_queue("Hello, this is a test.")
     #time.sleep(5)
-    logging.info("Adding more responses to the queue.")
+    logger.info("Adding more responses to the queue.")
     tts_engine.add_to_queue("I am trying to synthesize speech.")
     tts_engine.add_to_queue("This is the third response.")
-    logging.info("Responses added to the queue.")
+    logger.info("Responses added to the queue.")
     # Wait for a few seconds to allow the TTS engine to process the responses
-    logging.info("Waiting for the TTS engine to process the responses.")
+    logger.info("Waiting for the TTS engine to process the responses.")
     #time.sleep(15)
-    logging.info("Adding more responses to the queue.")
+    logger.info("Adding more responses to the queue.")
     tts_engine.interrupt_tts_playback()
     # Interrupt the TTS playback
     tts_engine.add_to_queue("This will get interrupted. I think, I am not sure.")
     time.sleep(2.5)
-    logging.info("Interrupting TTS playback.")
-    logging.info(f"Played Text: {tts_engine.interrupt_tts_playback()}")
-
+    logger.info("Interrupting TTS playback.")
+    logger.info(f"Played Text: {tts_engine.interrupt_tts_playback()}")
 
     print("Test completed.")"""

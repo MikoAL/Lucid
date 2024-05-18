@@ -1,19 +1,30 @@
 import os
+import sys
 
+sys.path.insert(0, r"C:\Users\User\Desktop\Projects\Lucid\modules")
 import time
 import transformers
 import torch
-from transformers.tools.agents import resolve_tools, evaluate, get_tool_creation_code, StopSequenceCriteria
+from transformers.tools.agents import StopSequenceCriteria
 import transformers.tools.agents
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.generation import StoppingCriteriaList
 from modules.tts import TTSEngine
+from modules.voice_recognition import VoiceRecognition
+
 import logging
+from rich.logging import RichHandler
+FORMAT = "%(message)s"  
+logging.basicConfig(
+    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler(rich_tracebacks=True,)]
+)
+logger = logging.getLogger("rich")
+
 import threading
 from threading import Event
 from queue import Queue
 
-logging.basicConfig(level=logging.INFO)
+
 tts_rate = 22050
 prompt_path = r".\Prompts"
 script_location = os.path.dirname(os.path.realpath(__file__))
@@ -67,13 +78,13 @@ def respond_or_not(conversation: dict) -> bool:
             conversation_string += f"Assistant: {i['content']}\n"
     conversation_string += "\nWould the AI respond to this conversation, or stay silent? Please answer with a simple 'Yes.' for respond and 'No.' for staying silent."
     response = single_turn_conversation(conversation_string, small_model, small_tokenizer, max_new_tokens=5)
-    logging.info(f"Conversation: \n{conversation_string}\n<End Of Conversation String>\n")
-    logging.info(f"\nAI Response: \n{response}")
+    logger.info(f"Conversation: \n{conversation_string}\n<End Of Conversation String>\n")
+    logger.info(f"\nAI Response: \n{response}")
     if response[:3].lower() == "yes":
-        logging.info("AI will respond.")
+        logger.info("AI will respond.")
         return True
     else:
-        logging.info("AI will not respond.")
+        logger.info("AI will not respond.")
         return False
 
 # ===== ===== ===== #
@@ -86,17 +97,17 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
         # Check for new user input
         if new_user_input_event.is_set():
             new_user_input_event.clear()
-            logging.info("New user input detected.")
+            logger.info("New user input detected.")
             start_time = time.time()
             user_input = user_text_queue.get()
-            logging.info(f"Got User Input: {user_input}")
+            logger.info(f"Got User Input: {user_input}")
             played_text = tts_engine.interrupt_tts_playback()
             current_conversation.append({"role": "system", "content": f"USER INTERRUPTED TTS PLAYBACK, TEXT DELIVERED: '{played_text}'"})
             current_conversation.append({'role': 'user', 'content': user_input})
 
             start_respond_or_not = time.time()
             if respond_or_not(current_conversation):
-                logging.info(f"\nRespond or Not took {(time.time() - start_respond_or_not):.2f} seconds.")
+                logger.info(f"\nRespond or Not took {(time.time() - start_respond_or_not):.2f} seconds.")
                 stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
                 inputs = direct_communication_tokenizer.apply_chat_template(current_conversation, tokenize=False, add_generation_prompt=True)
                 encoded_inputs = direct_communication_tokenizer(inputs, return_tensors="pt").to(device_for_tools)
@@ -110,10 +121,10 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
                                         top_p=0.95,
                                         do_sample=True,
                                         stopping_criteria=stopping_criteria,)
-                logging.info(f"\nGenerate took {(time.time() - start_generate):.2f} seconds.")
+                logger.info(f"\nGenerate took {(time.time() - start_generate):.2f} seconds.")
                 # Decode the response
                 response = direct_communication_tokenizer.decode(outputs[0].tolist()[src_len:-1])
-                logging.info(f"AI Response: {response}")
+                logger.info(f"AI Response: {response}")
                 tts_engine.add_to_queue(response)
                 current_conversation.append({'role':'assistant','content':response})
         
@@ -121,16 +132,15 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
 # ===== ===== ===== #
 # Main
 
-from modules.voice_recognition import VoiceRecognition
 
 
 user_text_queue = Queue()
 new_user_input_event = Event()
 def handle_user_input(text):
     global new_user_input_event, user_text_queue
-    logging.info(f"User: {text}")
+    logger.info(f"User: {text}")
     user_text_queue.put(text)
-    logging.info("User input added to queue.")
+    logger.info("User input added to queue.")
     new_user_input_event.set()
 
 microphone = VoiceRecognition(wake_word=None, function=handle_user_input)
@@ -141,5 +151,5 @@ threading.Thread(target=microphone.start).start()
 new_user_input_event.set()
 user_text_queue.put("Hello, Lucid!")
 tts_engine = TTSEngine()
-threading.Thread(target=tts_engine.start).start()
+threading.Thread(target=tts_engine.thread_logic).start()
 threading.Thread(target=direct_communication_logic, args=(tts_engine, new_user_input_event, user_text_queue, model, tokenizer)).start()

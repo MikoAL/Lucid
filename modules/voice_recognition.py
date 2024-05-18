@@ -1,16 +1,26 @@
 import queue
 from typing import Callable, List
-
+import time
 import numpy as np
 import sounddevice as sd
 from Levenshtein import distance
+import whisperx
 import logging
-
+from rich.logging import RichHandler
+FORMAT = "%(message)s"  
+logging.basicConfig(
+    level=logging.INFO, format=FORMAT, datefmt="[%X]", handlers=[RichHandler(rich_tracebacks=True,)]
+)
+logger = logging.getLogger("rich")
 import os
+from dotenv import load_dotenv
 
+script_dir = r"C:\Users\User\Desktop\Projects\Lucid"
+os.chdir(script_dir)
+load_dotenv()
 os.environ["TF_ENABLE_ONEDNN_OPTS"]='0'
 
-from . import vad
+import vad
 
 VAD_MODEL_PATH = r"C:\Users\User\Desktop\Projects\Lucid\modules\models\silero_vad.onnx"
 #VAD_MODEL_PATH = r"C:\Users\Miko_AL\Desktop\Projects\Lucid\voice_recognition\models\silero_vad.onnx"
@@ -25,26 +35,29 @@ SIMILARITY_THRESHOLD = 2  # Threshold for wake word similarity
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
-model_id = "distil-whisper/distil-large-v3"
-#model_id = "distil-whisper/distil-small.en"
-model = AutoModelForSpeechSeq2Seq.from_pretrained(
-    model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
-)
-model.to(device)
+device = "cuda" 
+audio_file = r"C:\Users\User\Desktop\Projects\Lucid\Test_Audio.wav"
+batch_size = 2 # reduce if low on GPU mem
+compute_type = "int8" # change to "int8" if low on GPU mem (may reduce accuracy)
 
-processor = AutoProcessor.from_pretrained(model_id)
-pipe = pipeline(
-    "automatic-speech-recognition",
-    model=model,
-    tokenizer=processor.tokenizer,
-    feature_extractor=processor.feature_extractor,
-    max_new_tokens=128,
-    torch_dtype=torch_dtype,
-    device=device,
-)
+# 1. Transcribe with original whisper (batched)
+logger.info(f"Loading whisper models...")
+model = whisperx.load_model("Systran/faster-distil-whisper-medium.en", device, compute_type=compute_type)
+model_a, metadata = whisperx.load_align_model(language_code="en", device=device)
+diarize_model = whisperx.DiarizationPipeline('pyannote/speaker-diarization-3.1', use_auth_token=os.getenv("HUGGINGFACE_READ_KEY"), device=device)
+logger.info(f"Models loaded.")
+
+def pipe(audio):
+    global model, model_a, metadata
+    logger.info(f"Transcribing audio...")
+    result = model.transcribe(audio, batch_size=batch_size)
+    #logger.info(f"Transcription complete. Aligning...")
+    #result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=False)
+    text_result = ""
+    for i in result["segments"]:
+        text_result += i["text"] + " "
+    return text_result.strip()
 class VoiceRecognition:
     def __init__(
         self, wake_word: str | None = None, function: Callable = print
@@ -114,16 +127,16 @@ class VoiceRecognition:
         """
         Starts the Glados voice assistant, continuously listening for input and responding.
         """
-        logging.info("Starting Listening...")
+        logger.info("Starting Listening...")
         self.input_stream.start()
-        logging.info("Listening Running")
+        logger.info("Listening Running")
         self._listen_and_respond()
 
     def _listen_and_respond(self):
         """
         Listens for audio input and responds appropriately when the wake word is detected.
         """
-        logging.info("Listening...")
+        logger.info("Listening...")
         while True:  # Loop forever, but is 'paused' when new samples are not available
             sample, vad_confidence = self.sample_queue.get()
             self._handle_audio_sample(sample, vad_confidence)
@@ -182,40 +195,43 @@ class VoiceRecognition:
         """
         Processes the detected audio and generates a response.
         """
-        logging.info("Detected pause after speech. Processing...")
+        logger.info("Detected pause after speech. Processing...")
 
-        logging.info("Stopping listening...")
+        logger.info("Stopping listening...")
         self.input_stream.stop()
 
         #detected_text = self.asr(self.samples)
         audio = np.concatenate(self.samples)
         
-        self.reset()
-        self.input_stream.start()
+        # self.reset()
+        # self.input_stream.start()
+        logger.info("Captured audio.")
+        start_transcribe = time.time()
+        detected_text = pipe(audio)
+        logger.info(f"Successfully transcribed: '{detected_text}' in {(time.time() - start_transcribe):.2f} seconds.")
         
-        detected_text = pipe(audio)['text']
 
         if detected_text:
-            logging.info(f"Detected: '{detected_text}'")
+            logger.info(f"Detected: '{detected_text}'")
 
             if self.wake_word is not None:
                 if self._wakeword_detected(detected_text):
-                    logging.info("Wake word detected!")
+                    logger.info("Wake word detected!")
                     self.func(detected_text)
                 else:
-                    logging.info("No wake word detected. Ignoring...")
+                    logger.info("No wake word detected. Ignoring...")
             else:
                 self.func(detected_text)
 
-        # self.reset()
-        # self.input_stream.start()
+        self.reset()
+        self.input_stream.start()
 
 
     def reset(self):
         """
         Resets the recording state and clears buffers.
         """
-        logging.info("Resetting recorder...")
+        logger.info("Resetting recorder...")
         self.recording_started = False
         self.samples.clear()
         self.gap_counter = 0
