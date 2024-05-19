@@ -5,10 +5,7 @@ sys.path.insert(0, r"C:\Users\User\Desktop\Projects\Lucid\modules")
 import time
 import transformers
 import torch
-from transformers.tools.agents import StopSequenceCriteria
-import transformers.tools.agents
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from transformers.generation import StoppingCriteriaList
+from transformers import AutoModelForCausalLM, AutoTokenizer, StopStringCriteria
 from modules.tts import TTSEngine
 from modules.voice_recognition import VoiceRecognition
 
@@ -51,18 +48,19 @@ def single_turn_conversation(prompt, model, tokenizer, max_new_tokens=256, tempe
     prompt_as_messages = [
         {"role": "user", "content": prompt},
     ]
-    stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
+    #stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
     inputs = tokenizer.apply_chat_template(prompt_as_messages, tokenize=False, add_generation_prompt=False )
     encoded_inputs = tokenizer(inputs, return_tensors="pt").to(device_for_tools)
     src_len = encoded_inputs["input_ids"].shape[1]
     # Generate the response
     outputs = model.generate(encoded_inputs["input_ids"],
+                             tokenizer=tokenizer,
                              max_new_tokens=max_new_tokens,
                              temperature=temperature,
                              top_k=top_k,
                              top_p=top_p,
                              do_sample=True,
-                             stopping_criteria=stopping_criteria,)
+                             stop_strings=["<|end|>"])
     # Decode the response
     return tokenizer.decode(outputs[0].tolist()[src_len:-1])
 
@@ -108,19 +106,20 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
             start_respond_or_not = time.time()
             if respond_or_not(current_conversation):
                 logger.info(f"\nRespond or Not took {(time.time() - start_respond_or_not):.2f} seconds.")
-                stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
+                #stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
                 inputs = direct_communication_tokenizer.apply_chat_template(current_conversation, tokenize=False, add_generation_prompt=True)
                 encoded_inputs = direct_communication_tokenizer(inputs, return_tensors="pt").to(device_for_tools)
                 src_len = encoded_inputs["input_ids"].shape[1]
                 # Generate the response
                 start_generate = time.time()
                 outputs = direct_communication_model.generate(encoded_inputs["input_ids"],
-                                        max_new_tokens=512,
-                                        temperature=0.85,
-                                        top_k=50,
-                                        top_p=0.95,
-                                        do_sample=True,
-                                        stopping_criteria=stopping_criteria,)
+                                            tokenizer=direct_communication_tokenizer,
+                                            max_new_tokens=512,
+                                            temperature=0.85,
+                                            top_k=50,
+                                            top_p=0.95,
+                                            do_sample=True,
+                                            stop_strings=["<|end|>"],)
                 logger.info(f"\nGenerate took {(time.time() - start_generate):.2f} seconds.")
                 # Decode the response
                 response = direct_communication_tokenizer.decode(outputs[0].tolist()[src_len:-1])
@@ -131,8 +130,6 @@ def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event
 
 # ===== ===== ===== #
 # Main
-
-
 
 user_text_queue = Queue()
 new_user_input_event = Event()

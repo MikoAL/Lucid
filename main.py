@@ -692,42 +692,8 @@ tts_text_queue = []
 
 # Single Turn Conversation
 
-def single_turn_conversation(prompt, model, tokenizer, max_length=256, temperature=0.85, top_k=50, top_p=0.95):
-    global device_for_tools
-    # Encode the prompt
-    prompt_as_messages = [
-        {"role": "user", "content": prompt},
-    ]
-    stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
-    inputs = tokenizer.apply_chat_template(prompt_as_messages, tokenize=False, add_generation_prompt=False )
-    encoded_inputs = tokenizer(inputs, return_tensors="pt").to(device_for_tools)
-    src_len = encoded_inputs["input_ids"].shape[1]
-    # Generate the response
-    outputs = model.generate(encoded_inputs["input_ids"],
-                             max_length=max_length,
-                             temperature=temperature,
-                             top_k=top_k,
-                             top_p=top_p,
-                             do_sample=True,
-                             stopping_criteria=stopping_criteria,)
-    # Decode the response
-    return tokenizer.decode(outputs[0].tolist()[src_len:-1])
-def respond_or_not(conversation: dict) -> bool:
-    """This function takes a conversation (The dictionary type with user, system, assistant...) and decides whether to respond or not."""
-    conversation_string = "The following is a conversation between an AI assistant and a User:\n"
-    for i in conversation:
-        if i["role"] == "user":
-            conversation_string += f"User: {i['content']}\n"
-        elif i["role"] == "system":
-            conversation_string += f"System: {i['content']}\n"
-        elif i["role"] == "assistant":
-            conversation_string += f"Assistant: {i['content']}\n"
-        conversation_string += "\nWould the AI respond to this conversation, or stay silent? Please answer with a simple 'Yes' for respond and 'No' for staying silent."
-    response = single_turn_conversation(conversation_string, model, tokenizer)
-    if response[:3].lower() == "yes":
-        return True
-    else:
-        return False
+from .modules.utils import single_turn_conversation, respond_or_not
+
 
 # ===== ===== ===== #
 # Direct communication
@@ -894,7 +860,7 @@ def direct_communication_logic():
                 for message in new_voice_messages:
                     current_conversation.append({'role':'user','content':message['content']})
             else:
-                if respond_or_not(current_conversation) == True:
+                if respond_or_not(current_conversation, small_model, small_tokenizer) == True:
                     stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(["<|end|>"], tokenizer)])
                     inputs = direct_communication_tokenizer.apply_chat_template(current_conversation, tokenize=False, add_generation_prompt=False )
                     encoded_inputs = direct_communication_tokenizer(inputs, return_tensors="pt").to(device_for_tools)

@@ -29,7 +29,7 @@ MAX_WAV_VALUE = 32767.0
 RATE = 22050
 
 # Settings
-MODEL_PATH = f"{script_location}\\tts\models\glados.onnx"
+MODEL_PATH = f"{script_location}\\tts\models\Lucid_v1.onnx"
 USE_CUDA = False
 
 # Conversions
@@ -339,7 +339,7 @@ class Synthesizer:
 
         return audio
 class TTSEngine:
-    def __init__(self, synthesizer=Synthesizer(model_path=f"{script_location}/models/glados.onnx", use_cuda=False), tts_rate=22050):
+    def __init__(self, synthesizer=Synthesizer(model_path=f"{script_location}/models/Lucid_v1.onnx", use_cuda=False), tts_rate=22050):
         self.synthesizer = synthesizer
         self.tts_rate = tts_rate
         self.tts_text_queue = []
@@ -368,7 +368,7 @@ class TTSEngine:
                 self.current_audio_text = self.tts_audio_queue_text.pop(0)
                 self.current_audio_start_time = time.time()
                 sd.play(audio, self.tts_rate)
-                self.current_audio_estimated_end_time = (time.time() + (len(audio) / self.tts_rate)*1.1)
+                self.current_audio_estimated_end_time = (time.time() + (len(audio) / self.tts_rate)*1.1 + 1)
                 self.tts_is_playing = True
                 logger.info(f"Estimated end time: {datetime.fromtimestamp(self.current_audio_estimated_end_time)}")
 
@@ -428,7 +428,7 @@ class TTSEngine:
 if __name__ == "__main__":
     
     # Create a Synthesizer instance
-    synthesizer = Synthesizer(model_path=f"{script_location}/models/glados.onnx", use_cuda=False)
+    synthesizer = Synthesizer(model_path=f"{script_location}/models/Lucid_v1.onnx", use_cuda=False)
 
     # Create a TTS engine instance
     tts_engine = TTSEngine(synthesizer, tts_rate=22050)
