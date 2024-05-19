@@ -14,26 +14,29 @@ llm_engine_settings = {
     "device": "cuda:0",
 }
 
-def llm_engine(messages, stop_sequences=["Task"]) -> str:
-    global llm_engine_settings
-    model = llm_engine_settings["model"]
-    tokenizer = llm_engine_settings["tokenizer"]
-    device = llm_engine_settings["device"]
-    inputs = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
-    encoded_inputs = tokenizer(inputs, return_tensors="pt").to(device)
-    src_len = encoded_inputs["input_ids"].shape[1]
-    # Generate the response
-    outputs = model.generate(encoded_inputs["input_ids"],
-                             tokenizer=tokenizer,
-                             max_new_tokens=1024,
-                             temperature=0.85,
-                             top_k=50,
-                             top_p=0.95,
-                             do_sample=True,
-                             pad_token_id=tokenizer.eos_token_id,
-                             stop_strings=stop_sequences)
-    # Decode the response
-    return tokenizer.decode(outputs[0].tolist()[src_len:-1])
+class MemoryAgent():
+    def __init__(self, model, tokenizer, device):
+        self.memory = []
+        self.model = model
+        self.tokenizer = tokenizer
+        self.device = device
+
+    def llm_engine(self, messages, stop_sequences=["Task"]) -> str:
+        inputs = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+        encoded_inputs = self.tokenizer(inputs, return_tensors="pt").to(self.device)
+        src_len = encoded_inputs["input_ids"].shape[1]
+        # Generate the response
+        outputs = self.model.generate(encoded_inputs["input_ids"],
+                                tokenizer=tokenizer,
+                                max_new_tokens=1024,
+                                temperature=0.85,
+                                top_k=50,
+                                top_p=0.95,
+                                do_sample=True,
+                                pad_token_id=self.tokenizer.eos_token_id,
+                                stop_strings=stop_sequences)
+        # Decode the response
+        return self.tokenizer.decode(outputs[0].tolist()[src_len:-1])
 
 class return_answer(Tool):
     name = "return_answer"
@@ -51,13 +54,9 @@ class return_answer(Tool):
         print(f">> The Agent's answer is: {answer}")
     
 return_answer_tool = return_answer()
-agent = CodeAgent(tools=[return_answer_tool], llm_engine=llm_engine, add_base_tools=True)
+agent = ReactCodeAgent(tools=[], llm_engine=llm_engine, add_base_tools=True)
 
-agent.run(
-    "Could you translate this sentence from French to English?",
-    sentence="Où est la boulangerie la plus proche?",
-)
-
+agent.step()
     
 class recall_memory(Tool):
     name = "recall_memory"

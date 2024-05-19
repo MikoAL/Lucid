@@ -114,6 +114,13 @@ This is what an unprocessed Info Block should look like
 """
 
 class Memory():
+    """Key Concepts:
+    - Unprocessed Info Block: A piece of information that is not yet processed.
+    - Info Block: A piece of information that is stored in the memory.
+    - Short Term Memory: A vector store that stores the most recent information.
+    - Working Memory: A vector store that stores the information that is currently being used.
+    - Long Term Memory: A vector store that stores all past information.
+    """
     
     def __init__(self, device_for_tools=device_for_tools):
         import chromadb
@@ -146,10 +153,12 @@ class Memory():
         pass    
     
     def without_keys(d, keys):
+        """A utility function to remove certain keys from a dictionary."""
         return {k: v for k, v in d.items() if k not in keys}
 
     
     def display_working_memory(self) -> str:
+        """This function returns a string representation of the working memory."""
         if len(self.working_memory) == 0:
             return "\n# Working Memory\nEmpty"
         else:
@@ -159,6 +168,7 @@ class Memory():
             return working_memory_str
     
     def add_working_memory(self, information: str) -> None:
+        """This function adds information to the working memory. It also checks if the information is already in the memory."""
         unprocessed_info_block = {
             'content' : information,
             'timestamp' : time.time(),
@@ -176,10 +186,12 @@ class Memory():
         self.add_to_short_term_memory(moved_memory)
         
     def clear_working_memory(self):
+        """This function clears the working memory."""
         for i in range(len(self.working_memory)):
             self.delete_working_memory(1)
     
     def add_to_short_term_memory(self, unprocessed_info_block: dict):
+        """This function processes the unprocessed info block and adds it to the short term memory."""
         info_block = self.process_unprocessed_info_block(unprocessed_info_block)
         info_block_no_vector = self.without_keys(info_block, ['vector'])
         self.short_term_memory_chroma_collection.add(
@@ -193,7 +205,7 @@ class Memory():
 # ===== ===== ===== #
 # Lucid Agents
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, Tool, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPTQConfig, Tool, pipeline
 class LucidAgent(LocalAgent):
         def __init__(self, model, tokenizer, chat_prompt_template=None, run_prompt_template=None, additional_tools=None):
             
@@ -207,82 +219,9 @@ class LucidAgent(LocalAgent):
 # ===== ===== ===== #
 # Lucid Council
 
-from transformers.tools.agents import resolve_tools, evaluate, get_tool_creation_code, StopSequenceCriteria
-import transformers.tools.agents
+
 from transformers.generation import StoppingCriteriaList
-
-
-# We do this so that the default tools are not initialized
-transformers.tools.agents._tools_are_initialized = True
-
     
-def select(prompt, options, model, tokenizer, does_the_model_add_a_token_before_generating=True):
-    if not options:
-        return None  # Handle the case of empty options list
-    #options = [option.strip() for option in options]
-    
-    if does_the_model_add_a_token_before_generating:
-        tokenized_options = [tokenizer(option, return_tensors="pt").to("cuda:0")["input_ids"].tolist()[0][1:] for option in options]
-    else:
-        tokenized_options = [tokenizer(option, return_tensors="pt").to("cuda:0")["input_ids"].tolist()[0] for option in options]
-    full_tokenized_options = tokenized_options.copy()
-    #print(tokenized_options)
-    round_number = 0
-    answer = []
-    while len(tokenized_options) > 1:  # Use > instead of != to ensure termination
-        round_number += 1
-        #print(f"round number: {round_number}")
-        #print(f"tokenized options: {tokenized_options}")
-        all_first_tokens = [option[0] for option in tokenized_options]
-        #print(f"all first tokens: {all_first_tokens}")
-        tokens_to_options = {}
-        for i in range(len(all_first_tokens)):
-            if all_first_tokens[i] not in tokens_to_options:
-                tokens_to_options[all_first_tokens[i]] = [tokenized_options[i]]
-            else:
-                tokens_to_options[all_first_tokens[i]].append(tokenized_options[i])
-        logit_bias = {}
-        for tokens_for_check in tokens_to_options:
-
-            logit_bias[tuple([tokens_for_check])] = 100.0
-        encoded_inputs = tokenizer(prompt, return_tensors="pt").to("cuda:0")
-        src_len = encoded_inputs["input_ids"].shape[1]
-        #print(logit_bias)
-        response = model.generate(
-            encoded_inputs["input_ids"],
-            max_new_tokens=3,
-            temperature=0.85,
-            sequence_bias=logit_bias,
-            renormalize_logits = True,
-            output_scores = True,
-            do_sample=True,
-        )
-        #print(f"response: {response.tolist()}\nend of response")
-        response_token = response[0].tolist()[src_len:][0]
-        response_word = tokenizer.decode(response_token)
-        #print(f"response word: {response_word}")
-        prompt += response_word
-        answer.append(response_token)
-        #print(f"checking if {response_token} is in {tokens_to_options.keys()}")
-        if response_token in tokens_to_options.keys():
-            for i in tokens_to_options[response_token]:
-                #print(f"all options: {i}")
-                if len(i) == 0:
-                    break
-            tokenized_options = [i[1:] for i in tokens_to_options[response_token]]
-            #print(f"tokenized options: {tokenized_options}")
-
-
-        else:
-            # Handle the case where the response token is not found among the options
-            break  # Exit the loop to avoid potential infinite loop
-        # decode the final tokenized answer
-    for i in range(len(full_tokenized_options)):
-        if full_tokenized_options[i][:len(answer)] == answer:
-            answer_idx = i
-            break
-    return options[answer_idx]
-
 class LucidCouncil(LocalAgent):
     def __init__(self, model, tokenizer, members: dict, additional_tools=None, council_example_prompt=council_example_prompt):
         self.members = members
@@ -402,16 +341,15 @@ This session's tools:
         Lucid_council_prompt = (self.tokenizer.apply_chat_template(prompt_as_messages, tokenize=False, add_generation_prompt=True)).strip()
         super().__init__(model, tokenizer, chat_prompt_template=Lucid_council_prompt,run_prompt_template=None, additional_tools=additional_tools)
         
-    def generate_one(self, prompt, stop, max_new_tokens=2048, temperature=0.85):
+    def generate_one(self, prompt, stop: list, max_new_tokens=2048, temperature=0.85):
         
         encoded_inputs = self.tokenizer(prompt, return_tensors="pt").to(self._model_device)
         src_len = encoded_inputs["input_ids"].shape[1]
-        stopping_criteria = StoppingCriteriaList([StopSequenceCriteria(stop, self.tokenizer)])
         outputs = self.model.generate(
             encoded_inputs["input_ids"],
             max_new_tokens=max_new_tokens,
             temperature=temperature,
-            stopping_criteria=stopping_criteria,
+            stop_string=stop,
             do_sample=True,
             min_new_tokens=1,
         )
@@ -670,21 +608,7 @@ class web_search(Tool):
         pass
 # ===== ===== ===== #
 # TTS function
-from .tts import Synthesizer
-import sounddevice as sd
-TTS_USE_CUDA = False
-synthesizer = Synthesizer(tts_model, TTS_USE_CUDA)
-text = "Hello, world!"
-import time
 
-start_time = time.time()
-audio = synthesizer.generate_speech_audio(text)
-print(f"Generated audio for '{text}' in {time.time() - start_time:.2f} seconds.")
-sd.play(audio, tts_rate)
-sd.wait()
-print(f"Generated audio for '{text}'.")
-tts_audio_queue = []
-tts_text_queue = []
 
 
 # ===== ===== ===== #
@@ -707,32 +631,12 @@ class DirectCommunication():
 # ===== ===== ===== #
 # Load the model and tokenizer
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, LocalAgent, GPTQConfig, BitsAndBytesConfig, Tool, pipeline
-
-"""
-gptq_config = GPTQConfig(bits=4, exllama_config={"version":2})
-model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4", device_map="cuda:0", quantization_config=gptq_config)
-tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-14B-Chat-GPTQ-Int4")
-"""
-
+from transformers import AutoModelForCausalLM, AutoTokenizer, GPTQConfig, BitsAndBytesConfig, Tool, pipeline
 
 bnb_config = BitsAndBytesConfig(load_in_4bit=True)
 model = AutoModelForCausalLM.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", device_map="cuda:0", quantization_config=bnb_config)
 tokenizer = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit")
 tokenizer_with_prefix_space = AutoTokenizer.from_pretrained("unsloth/llama-3-8b-Instruct-bnb-4bit", add_prefix_space=True)
-
-
-"""
-gptq_config = GPTQConfig(bits=8, exllama_config={"version":1})
-model = AutoModelForCausalLM.from_pretrained("astronomer/Llama-3-8B-Instruct-GPTQ-8-Bit", device_map="cuda:0", quantization_config=gptq_config)
-tokenizer = AutoTokenizer.from_pretrained("astronomer/Llama-3-8B-Instruct-GPTQ-8-Bit")
-#model=model.bfloat16()
-"""
-
-"""
-model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-3-mini-128k-instruct", device_map="cuda:0", trust_remote_code=True)
-tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-128k-instruct")
-"""
 
 small_model = AutoModelForCausalLM.from_pretrained("unsloth/Phi-3-mini-4k-instruct-bnb-4bit", device_map="cuda:1", trust_remote_code=True)
 small_tokenizer = AutoTokenizer.from_pretrained("unsloth/Phi-3-mini-4k-instruct-bnb-4bit")
