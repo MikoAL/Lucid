@@ -1,50 +1,6 @@
 # Project Goal
 Make an AI that can pass as human even after long periods of interactions.
 
-### Essential Systems
-- Thought Process [HARD]
-- UI [HARD]
-- OBS intergration [MEDIUM]
-- Live2D [HARD] [ON HOLD]
-- Memory [HARD]
-  - Short-Term [MEDIUM]
-  - Long-Term [HARD]
-- Voice Output [MEDIUM]
-
-### Top Extra Priorities
-- Real Time Chat
-  - Voice Input [MEDIUM]
-
-# Notes
-# Project Plans
-I am planning on turning her into a discord bot, so I can avoid the issue of setting up ports for non-local uses.
-
-
-
-### Overview
-The Thought Process module is crucial for creating a believable AI Vtuber. The ChatGPT model can be used as the foundation for generating responses and maintaining coherent conversations. However, further planning is necessary to enhance its capabilities.
-
-### Steps
-1. **Define Personality and Characteristics:**
-   - Determine the personality traits, preferences, and characteristics that the AI Vtuber will exhibit.
-   - Plan how the AI will adapt and evolve its personality over time based on interactions.
-
-2. **COT Implementation (Consciousness Over Time):**
-   - Develop a system for the AI Vtuber to have a sense of consciousness over time, remembering past interactions and building upon them.
-   - Implement mechanisms for the AI to learn from user input and adjust its responses accordingly.
-
-3. **Emotional Intelligence:**
-   - Integrate emotional intelligence into the Thought Process to enable the AI Vtuber to understand and respond to users' emotions appropriately.
-   - Implement mood adaptation to simulate a more human-like emotional range.
-
-4. **Dynamic Decision-Making:**
-   - Create a decision-making system that allows the AI to dynamically choose responses based on the context of the conversation.
-   - Implement mechanisms to handle ambiguous or open-ended questions.
-
-
-
-
-
 
 
 
@@ -87,48 +43,6 @@ In Conversation Mode, the AI can retrieve information from Long-term Memory to W
 During Sleep Mode, the AI conducts a thorough review of vector databases. This process involves comparing newly added data from Short-term Memory with existing records. Using cross-encoders, the AI evaluates the similarity of initial query results. If significant resemblance is found, the language model is employed to merge the information, treating it as new data. This iterative process continues until no substantial similarities remain, ensuring a streamlined and coherent database.
 
 
-
-
-
-# 6. Voice Output
-
-### Overview
-Selecting a high-quality voice model is essential for creating a natural and engaging voice for the AI Vtuber.
-
-### Steps
-1. **Voice Model Selection:**
-   - Research and choose a voice model that aligns with the personality and tone of the AI Vtuber.
-   - Consider factors such as expressiveness, clarity, and adaptability.
-
-2. **Integration with Thought Process:**
-   - Integrate the selected voice model with the Thought Process module to synchronize speech with the AI's generated responses.
-   - Fine-tune parameters for a more natural and human-like voice.
-
-
-
-
-
-## Top Extra Priorities
-
-### Real-Time Chat
-
-1. **Chat Integration:**
-   - Implement a real-time chat system to engage with the audience during live streams.
-   - Explore options for voice input to allow users to interact with the AI Vtuber using voice commands.
-
-### Project Management
-
-1. **Task Prioritization:**
-   - Prioritize tasks based on dependencies and critical path analysis.
-   - Use agile development methodologies to adapt to changing requirements.
-
-2. **Regular Testing and Feedback:**
-   - Conduct regular testing of all components to identify and address issues promptly.
-   - Gather user feedback to make iterative improvements and enhance the AI Vtuber's performance over time.
-
-3. **Security and Privacy:**
-   - Implement robust security measures to protect user data and ensure privacy.
-   - Comply with relevant data protection regulations and guidelines.
 
 4. **Community Engagement:**
    - Build a community around the AI Vtuber through social media, streaming platforms, and dedicated forums.
