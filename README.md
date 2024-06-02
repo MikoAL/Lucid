@@ -14,3 +14,9 @@ If you want to create a similar but functional project, it is recommended to sta
 ## Project Goal
 
 Create a Chatbot that you can speak and listen to for a long time and still have the bot reasonably pass as a human.
+
+## License
+
+Until I know how licenses work, all rights are reserved to the repository owner.
+
+Will update this section when I know how to legally protect myself.
