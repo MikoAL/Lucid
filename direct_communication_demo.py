@@ -90,7 +90,7 @@ def respond_or_not(conversation: dict) -> bool:
 def direct_communication_logic(tts_engine: TTSEngine,new_user_input_event: Event, user_text_queue: Queue, direct_communication_model, direct_communication_tokenizer):
 
     time.sleep(0.03)
-    current_conversation = [{'role':'system','content':f"You are Lucid, here are some information on Lucid:\n{Lucid_prompt_card}\nPlease respond as if you were Lucid."}]
+    current_conversation = [{'role':'system','content':f"You are Lucid, here are some information on Lucid:\n{Lucid_prompt_card}\nPlease respond as if you were Lucid. Only respond in plain text."}]
     while True:
         # Check for new user input
         if new_user_input_event.is_set():
