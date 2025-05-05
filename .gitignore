@@ -3,3 +3,4 @@ cool assets/
 .env
 modules/models
 Prompts
+/models

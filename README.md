@@ -9,7 +9,7 @@ All code in the repository is not usable right out of the box and will require m
 
 It is simply a collection of ideas and concepts that are being worked on and are not yet ready for use.
 
-If you want to create a similar but functional project, it is recommended to start with the [GlaDOS](https://github.com/dnhkng/GlaDOS) repo by [dnhkng](https://github.com/dnhkng).
+If you want to create a similar but functional project, it is recommended to start with the [GlaDOS](https://github.com/dnhkng/GlaDOS) repo by [dnhkng](https://github.com/dnhkng), where I **borrowed** some code from :D
 
 ## Project Goal
 
