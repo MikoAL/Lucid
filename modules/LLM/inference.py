@@ -16,7 +16,7 @@ class LMEngine():
         if service_type == "ollama":
             self.ollama_init()
         else:
-            ValueError(f"Unknow service_type: {service_type}")
+            ValueError(f"Unknown service_type: {service_type}")
             
     def ollama_init(self):    
         self.ollama_client = Client(host="http://localhost:11434")
@@ -40,4 +40,4 @@ class LMEngine():
 if __name__ == "__main__":
     lm = LMEngine()
     #print("Started lm.")
-    print(lm.gen())
+    print(lm.gen("This is a story"))
