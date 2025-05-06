@@ -1,5 +1,6 @@
 {
     "context" : "Mistral V7",
     "instruct" : "Mistral V7",
-    "sysprompt" : "Actor"
+    "sysprompt" : "Actor",
+    "preset" : "Qwen3-T4"
 }
