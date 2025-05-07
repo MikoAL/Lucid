@@ -1,0 +1,11 @@
+[project]
+name = "lucid"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "llama-cpp-python>=0.3.8",
+    "ollama>=0.4.8",
+    "transformers>=4.51.3",
+]
