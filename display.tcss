@@ -1,6 +1,0 @@
-Placeholder {
-    width: 1fr;
-    height: 1fr;
-    outline: round white;
-    margin: 1 1;
-}

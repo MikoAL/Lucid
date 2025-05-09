@@ -1,0 +1,3 @@
+# LLM Setttings
+- https://rentry.org/llm-settings
+- https://huggingface.co/docs/transformers/main_classes/configuration

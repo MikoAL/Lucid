@@ -1,0 +1,8 @@
+
+<palette>
+  <color name="Orange peel" hex="fda331" r="253" g="163" b="49" />
+  <color name="Rich black" hex="0d1821" r="13" g="24" b="33" />
+  <color name="Indigo dye" hex="344966" r="52" g="73" b="102" />
+  <color name="Powder blue" hex="b4cded" r="180" g="205" b="237" />
+  <color name="Baby powder" hex="f0f4ef" r="240" g="244" b="239" />
+</palette>
