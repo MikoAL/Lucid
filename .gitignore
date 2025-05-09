@@ -3,3 +3,4 @@ cool assets/
 .env
 modules/models
 Prompts
+models/LLM/Qwen3-14B-Q4_K_M.gguf
