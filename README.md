@@ -3,6 +3,9 @@
 ## Disclamer
 
 This project is a work in progress and is not yet ready for use.
+
+***For the newest version, please see the V3 branch***
+
 All code in the repository is not usable right out of the box and will require modification to work.
 
 ***It is not recommended to use any of the code in this repository for any purpose.***
