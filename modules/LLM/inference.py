@@ -1,17 +1,13 @@
 import httpx
-
 from loguru import logger
-
-from ollama import Client
-
-import openai
-
 from pathlib import Path
 import sys
+
+from ollama import Client
+import openai
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from setting_loader import load_settings
-
 
 class LMEngine():
     def __init__(self, service_type = "llama_server", override_preset={}):
